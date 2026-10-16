@@ -88,6 +88,7 @@ body.touch #carbtn { display: block; } body.touch.driving #brakebtn { display: b
 #panel .card { box-shadow: 0 30px 100px #0009; }
 #loading { z-index: 10; text-align: center; padding: 24px; letter-spacing: .1em; }
 @media (max-width: 640px) { #demo-guide { bottom: calc(274px + env(safe-area-inset-bottom)); width: calc(100% - 60px); } .card h2 { font-size: 26px; } #dialog { bottom: calc(130px + env(safe-area-inset-bottom)); } }
+.demo-cover{display:block;width:100%;height:auto;max-height:35vh;object-fit:contain;background:#09090d;border:1px solid var(--line);border-radius:6px}#panel{align-items:safe center} @media(max-width:640px){.demo-cover{max-height:24vh}.card.wide{padding:16px;gap:10px}}
 </style>
 <script type="importmap">
 { "imports": {
@@ -117,11 +118,11 @@ body.touch #carbtn { display: block; } body.touch.driving #brakebtn { display: b
 <button id="shutter" aria-label="Take a photo">SHOOT</button>
 <div id="toast" class="hud" role="status"></div>
 <div id="flash"></div><div id="fade"></div>
-<button id="quality" aria-label="Cycle graphics quality">BALANCED</button>
+<button id="quality" aria-label="Cycle graphics quality: performance, balanced, cinematic">BALANCED</button>
 <div id="demo-guide" hidden role="status"></div>
 <div id="loading">MVP MEDIA · LAS VEGAS — THE UNDERGROUND CUT</div>
 <script type="module">
-import('./main.js').catch(error => {
+import('./main.js?v=velvet-block-3').catch(error => {
   console.error(error);
   const loading = document.getElementById('loading');
   loading.hidden = false;

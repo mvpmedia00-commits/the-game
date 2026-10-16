@@ -5,9 +5,27 @@ import * as THREE from 'three';
 const rand = (a, b) => a + Math.random() * (b - a);
 const lerp = (a, b, t) => a + (b - a) * t;
 const matCache = {}, geoCache = {};
+let skinDetail = null, clothDetail = null;
+function microTexture(cloth = false) {
+  if (cloth ? clothDetail : skinDetail) return cloth ? clothDetail : skinDetail;
+  const size = 128, pixels = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const i = (y * size + x) * 4;
+    const value = cloth ? 125 + ((x + y) % 4 < 2 ? 28 : -28) + Math.sin(y * 1.6) * 10 : 128 + Math.sin(x * 12.9898 + y * 78.233) * 24;
+    pixels[i] = pixels[i + 1] = pixels[i + 2] = value; pixels[i + 3] = 255;
+  }
+  const texture = new THREE.DataTexture(pixels, size, size); texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(cloth ? 3 : 2, cloth ? 3 : 2); texture.needsUpdate = true;
+  if (cloth) clothDetail = texture; else skinDetail = texture; return texture;
+}
+
 function mat(color, rough = 0.6, metal = 0, extra) {
   const k = 's' + color + rough + metal + (extra ? Object.keys(extra).join() + Object.values(extra).join() : '');
-  return matCache[k] || (matCache[k] = new THREE.MeshStandardMaterial(Object.assign({ color: new THREE.Color(color), roughness: rough, metalness: metal }, extra || {})));
+  if (matCache[k]) return matCache[k];
+  const skin = !metal && (rough === .44 || rough === .46), fabric = !metal && rough === .62;
+  const options = Object.assign({ color: new THREE.Color(color), roughness: rough, metalness: metal }, extra || {});
+  if (skin) Object.assign(options, { bumpMap: microTexture(), bumpScale: .0007, sheen: .12, sheenRoughness: .75, sheenColor: new THREE.Color('#bd8271') });
+  if (fabric) Object.assign(options, { bumpMap: microTexture(true), bumpScale: .0014, sheen: .3, sheenRoughness: .8, sheenColor: new THREE.Color(color) });
+  return (matCache[k] = skin || fabric ? new THREE.MeshPhysicalMaterial(options) : new THREE.MeshStandardMaterial(options));
 }
 function basic(color, extra) {
   const k = 'b' + color + (extra ? Object.keys(extra).join() + Object.values(extra).join() : '');
@@ -90,7 +108,7 @@ function springGroup(parent, list, kind, pivot, axis, len) {
   return g;
 }
 const torsoPts = rs => rs.map((r, i) => [r, -0.14 + i * 0.05]);
-const latheG = (key, pts, seg = 22) => geo('L' + key, () => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg, Math.PI, Math.PI * 2));
+const latheG = (key, pts, seg = 32) => geo('L' + key, () => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg, Math.PI, Math.PI * 2));
 const limbPts = (rs, len) => rs.map((r, i) => [r, -len + i * len / (rs.length - 1)]);
 const TORSO_F = [0.15, 0.165, 0.168, 0.158, 0.14, 0.122, 0.12, 0.128, 0.142, 0.153, 0.15, 0.142, 0.135, 0.108, 0.055];
 const TORSO_M = [0.16, 0.165, 0.162, 0.155, 0.152, 0.155, 0.163, 0.177, 0.192, 0.202, 0.207, 0.203, 0.188, 0.142, 0.062];
@@ -177,7 +195,9 @@ function heroHead(L, fem, head) {
   const white = mat('#f4efe8', 0.18), iris = mat('#2a160c', 0.15, 0.1), dark = mat('#0b0707', 0.5);
   for (const s of [-1, 1]) {
     head.add(Sc(M(sphG(0.016, 14, 10), white, s * 0.039, 0.127, 0.088), 1.15, 0.75, 0.6));
-    head.add(M(sphG(0.0085, 12, 8), iris, s * 0.039, 0.127, 0.0985));
+    head.add(M(sphG(0.0085, 16, 12), iris, s * 0.039, 0.127, 0.0985));
+    head.add(M(sphG(.004, 12, 8), mat('#050405', .1), s * .039, .127, .105));
+    head.add(M(sphG(.0018, 8, 6), basic('#fff4e7'), s * .039 - .002, .130, .108));
     head.add(Rt(M(boxG(0.04, 0.0055, 0.01), dark, s * 0.04, 0.152, 0.098), 0, 0, s * (fem ? -0.18 : -0.08)));
     if (fem) head.add(Rt(M(boxG(0.034, 0.004, 0.006), dark, s * 0.04, 0.137, 0.1), 0, 0, s * -0.1));
     head.add(Sc(M(sphG(0.024, 10, 8), skin, s * 0.104, 0.112, -0.004), 0.45, 1, 0.75));
@@ -247,13 +267,19 @@ function makeHero(L) {
   const pelvisM = L.outfit === 'suit' || L.outfit === 'casual' ? mat(L.bottom || '#1b1b24', 0.62) : L.outfit === 'two' ? mat('#121012', 0.55) : mat(L.color, 0.5);
   hips.add(Sc(M(sphG(0.15, 22, 16), pelvisM, 0, -0.02, 0), fem ? 1.1 : 1.12, 0.72, fem ? 0.8 : 0.78));
   const spine = new THREE.Group(); spine.position.y = 0.05; hips.add(spine);
-  const torsoM = new THREE.MeshStandardMaterial({ map: torsoTex(L), roughness: L.outfit === 'two' ? 0.42 : 0.6, metalness: 0 });
+  const torsoM = new THREE.MeshPhysicalMaterial({ map: torsoTex(L), roughness: L.outfit === 'two' ? 0.46 : 0.6, metalness: 0, bumpMap: microTexture(L.outfit !== 'two'), bumpScale: L.outfit === 'two' ? .0007 : .0012, sheen: .18, sheenRoughness: .75 });
   spine.add(Sc(M(latheG(fem ? 'tf' : 'tm', torsoPts(fem ? TORSO_F : TORSO_M), 28), torsoM), 1, 1, fem ? 0.7 : 0.63));
   const delt = heroMat(L, 'upperArm');
   for (const s of [-1, 1]) spine.add(Sc(M(sphG(fem ? 0.054 : 0.07, 16, 12), delt, s * (fem ? 0.15 : 0.205), 0.445, 0), 1, 0.9, 0.9));
   spine.add(M(latheG(fem ? 'nf' : 'nm', [[fem ? 0.052 : 0.068, 0], [fem ? 0.044 : 0.06, 0.06], [fem ? 0.046 : 0.062, 0.13]], 16), mat(L.skin, 0.44), 0, 0.52, -0.005));
   if (L.outfit === 'suit') { // open jacket skirt + collar
     const jk = mat(L.color, 0.62, 0, { side: THREE.DoubleSide });
+    // Raised lapels and buttons give the suit depth beyond the painted torso texture.
+    for (const side of [-1, 1]) {
+      const shape = new THREE.Shape(); shape.moveTo(side*.055,.54);shape.lineTo(side*.16,.48);shape.lineTo(side*.11,.36);shape.lineTo(side*.035,.24);shape.closePath();
+      const lapel = new THREE.Mesh(new THREE.ShapeGeometry(shape), jk);lapel.position.z=.129;spine.add(lapel);
+      for (let i=0;i<3;i++) spine.add(M(sphG(.006,10,8),mat('#151319',.3,.35),side*.065,.23-i*.065,.115));
+    }
     hips.add(M(geo('jskirt', () => new THREE.CylinderGeometry(0.168, 0.188, 0.2, 28, 1, true, 0.42, Math.PI * 2 - 0.84)), jk, 0, -0.07, 0));
     spine.add(Sc(M(geo('collar', () => new THREE.CylinderGeometry(0.075, 0.1, 0.06, 24, 1, true, 0.6, Math.PI * 2 - 1.2)), mat('#0e0d11', 0.6, 0, { side: THREE.DoubleSide }), 0, 0.555, 0), 1, 1, 0.9));
   }
@@ -330,7 +356,7 @@ const RUBY_B = { shR: [-2.35, 0, -0.45], elR: [-1.55, 0, 0], shL: [0.08, 0, 0.12
 const TALENT = {
   ruby: { name: 'Ruby Monroe', age: 26, role: 'Featured dancer, The Velvet Room', star: 3, fee: 600, light: 'neon', mood: 'playful', req: 0,
     bio: 'Headliner at the Velvet Room. Red beret, sharper business sense than half the casino bosses on the Strip.',
-    look: { skin: '#b07a52', hair: 'afro', hairC: '#9e1018', outfit: 'two', color: '#d0121e', beret: true, hoops: true, tattoo: true, lips: '#9a0e1a', nails: '#c40f1c' } },
+    look: { skin: '#b07a52', hair: 'afro', hairC: '#bd1624', outfit: 'two', color: '#d0121e', beret: true, hoops: true, tattoo: true, lips: '#9a0e1a', nails: '#c40f1c' } },
   nova: { name: 'Nova Starr', age: 24, role: 'Glamour & fashion model', star: 3, fee: 700, light: 'warm', mood: 'romantic', req: 0,
     bio: 'Built a following one sunset at a time. Wants magazine covers and is willing to work for them.',
     look: { skin: '#c48a64', hair: 'long', hairC: '#2a1a12', outfit: 'gown', color: '#e8b64c' } },
@@ -344,6 +370,6 @@ const TALENT = {
     bio: 'Two million followers and her own production company. She only signs with people who have already proven they can sell.',
     look: { skin: '#e0b090', hair: 'long', hairC: '#d8c070', outfit: 'dress', color: '#3ad7ff' } },
 };
-const MVP_LOOK = { fem: false, skin: '#4a2a1c', color: '#b3121c', bottom: '#a8101a', outfit: 'suit', hair: 'braids', beret: true, beard: true, camera: true, scale: 1.06 };
+const MVP_LOOK = { fem: false, skin: '#6a3e2a', color: '#d41b27', bottom: '#c51622', outfit: 'suit', hair: 'braids', beret: true, beard: true, camera: true, scale: 1.06 };
 
 export { mat, basic, geo, cylG, sphG, boxG, planeG, M, Sc, Rt, canvasTex, glowTex, textTex, signMesh, gradTex, neon, setPose, walkPose, REST, HOLD, POSES, makeHero, makeDSLR, updProps, MVP_SHOOT, MVP_STAND, RUBY_A, RUBY_B, TALENT, MVP_LOOK, shade };

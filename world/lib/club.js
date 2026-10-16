@@ -1,6 +1,7 @@
 // The Velvet Room: club interior for Ruby's headliner set.
 import * as THREE from 'three';
 import { mat, neon, signMesh, canvasTex, M, Rt, boxG, cylG, sphG } from '../../hd-demo/lib/characters.js';
+import { dressVelvetInterior } from './venue.js';
 import { pedModel } from './npcs.js';
 
 export function buildClub(sc) {
@@ -10,8 +11,8 @@ export function buildClub(sc) {
   velvet.wrapS = THREE.RepeatWrapping; velvet.repeat.set(6, 1);
   const tiles = canvasTex(256, 256, (g) => { g.fillStyle = '#060406'; g.fillRect(0, 0, 256, 256); for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { g.fillStyle = (x + y) % 2 ? '#141014' : '#0c080c'; g.fillRect(x * 64 + 1, y * 64 + 1, 62, 62); } });
   tiles.wrapS = tiles.wrapT = THREE.RepeatWrapping; tiles.repeat.set(12, 14);
-  const floor = Rt(M(new THREE.PlaneGeometry(26, 30), new THREE.MeshStandardMaterial({ map: tiles, roughness: 0.18, metalness: 0.4 })), -Math.PI / 2, 0, 0); floor.receiveShadow = true; sc.add(floor);
-  const wallM = new THREE.MeshStandardMaterial({ map: velvet, roughness: 0.95 });
+  const floor = Rt(M(new THREE.PlaneGeometry(26, 30), new THREE.MeshPhysicalMaterial({ map: tiles, roughness: 0.24, metalness: 0.25, clearcoat: 1, clearcoatRoughness: .12 })), -Math.PI / 2, 0, 0); floor.receiveShadow = true; sc.add(floor);
+  const wallM = new THREE.MeshPhysicalMaterial({ map: velvet, roughness: 0.92, sheen: .7, sheenColor: new THREE.Color('#8c193a'), sheenRoughness: .9 });
   for (const [x, z, w, ry] of [[0, -15, 26, 0], [-13, 0, 30, Math.PI / 2], [13, 0, 30, -Math.PI / 2], [0, 15, 26, Math.PI]]) { const wl = M(new THREE.PlaneGeometry(w, 8), wallM, x, 4, z); wl.rotation.y = ry; sc.add(wl); }
   sc.add(Rt(M(new THREE.PlaneGeometry(26, 30), mat('#050304', 1)), Math.PI / 2, 0, 0)); sc.children[sc.children.length - 1].position.y = 8;
   // stage
@@ -57,6 +58,7 @@ export function buildClub(sc) {
     const p = pedModel(); p.root.position.set(x, 0, z); p.root.rotation.y = Math.atan2(-x, -7 - z); sc.add(p.root);
     crowd.push({ ...p, ph: Math.random() * 6 }); circles.push({ x, z, r: 0.4 });
   }
+  dressVelvetInterior(sc);
   const bounds = { minX: -12.4, maxX: 12.4, minZ: -14.4, maxZ: 14 };
   const exit = { x: 0, z: 13.2 };
   const update = (t) => {

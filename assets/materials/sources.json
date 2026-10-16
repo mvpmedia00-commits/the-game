@@ -1,0 +1,44 @@
+[
+  {
+    "file": "asphalt_02_color.jpg",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_02/asphalt_02_diff_1k.jpg",
+    "asset": "https://polyhaven.com/a/asphalt_02",
+    "license": "CC0-1.0",
+    "md5": "fa19772d4817754c3efab708c651f5a8"
+  },
+  {
+    "file": "asphalt_02_normal.jpg",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_02/asphalt_02_nor_gl_1k.jpg",
+    "asset": "https://polyhaven.com/a/asphalt_02",
+    "license": "CC0-1.0",
+    "md5": "338da8de636ea36133170578cac82e8e"
+  },
+  {
+    "file": "asphalt_02_roughness.jpg",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_02/asphalt_02_rough_1k.jpg",
+    "asset": "https://polyhaven.com/a/asphalt_02",
+    "license": "CC0-1.0",
+    "md5": "ec80a2929797c1b3ffc121c4f665585a"
+  },
+  {
+    "file": "concrete_floor_02_color.jpg",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_02/concrete_floor_02_diff_1k.jpg",
+    "asset": "https://polyhaven.com/a/concrete_floor_02",
+    "license": "CC0-1.0",
+    "md5": "1cfee53d2f82fa59726ab7ae6a2e8c09"
+  },
+  {
+    "file": "concrete_floor_02_normal.jpg",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_02/concrete_floor_02_nor_gl_1k.jpg",
+    "asset": "https://polyhaven.com/a/concrete_floor_02",
+    "license": "CC0-1.0",
+    "md5": "c2065fd81f571f4e39163ea5661128fb"
+  },
+  {
+    "file": "concrete_floor_02_roughness.jpg",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_02/concrete_floor_02_rough_1k.jpg",
+    "asset": "https://polyhaven.com/a/concrete_floor_02",
+    "license": "CC0-1.0",
+    "md5": "653d60d0db1872a49138455cf31c8326"
+  }
+]

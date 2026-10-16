@@ -3,14 +3,17 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { buildVisuals, CinemaGrade } from './lib/visuals.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import * as C from '../hd-demo/lib/characters.js';
 import { buildStudio } from '../hd-demo/lib/studio.js';
 import { SpringSystem } from '../hd-demo/lib/springs.js';
-import { buildDistrict } from './lib/district.js';
+import { buildDistrict } from './lib/district.js?v=block-3';
 import { Traffic, Pedestrians, carModel } from './lib/npcs.js';
-import { buildClub } from './lib/club.js';
+import { buildClub } from './lib/club.js?v=block-3';
 import { PlayerCar, Chaser } from './lib/car.js';
 import { STORY, NPC_LOOKS, FREELANCE, FREE_LOOKS, GIG_SPOTS, GEAR, SETS, BUDGET, CALLS, FILM_TITLES, RUNGS, ATTITUDE } from './lib/story.js';
 
@@ -40,6 +43,8 @@ const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 1500);
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(new THREE.Scene(), camera); composer.addPass(renderPass);
 const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.65, 0.5, 0.9); composer.addPass(bloom);
+const edgePass = new ShaderPass(FXAAShader); edgePass.enabled = TOUCH; composer.addPass(edgePass);
+const gradePass = new ShaderPass(CinemaGrade); composer.addPass(gradePass);
 composer.addPass(new OutputPass());
 
 // ---------- audio (synth, starts on first input)
@@ -61,15 +66,16 @@ const world = new THREE.Scene();
 const skyTex = C.canvasTex(8, 512, (g) => { const r = g.createLinearGradient(0, 0, 0, 512); r.addColorStop(0, '#05030c'); r.addColorStop(0.55, '#120a24'); r.addColorStop(0.8, '#3a1428'); r.addColorStop(1, '#6a2a2a'); g.fillStyle = r; g.fillRect(0, 0, 8, 512); });
 world.add(new THREE.Mesh(new THREE.SphereGeometry(1200, 32, 16), new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false })));
 { const g = new THREE.BufferGeometry(), p = []; for (let i = 0; i < 1500; i++) { const a = Math.random() * Math.PI * 2, e = Math.random() * 1.3 + 0.12; p.push(Math.cos(a) * Math.cos(e) * 1100, Math.sin(e) * 1100, Math.sin(a) * Math.cos(e) * 1100); } g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); world.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 1.4, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.7 }))); }
-world.fog = new THREE.Fog(0x1a0c1c, 70, 460);
+world.fog = new THREE.Fog(0x141521, 95, 510);
 { const pm = new THREE.PMREMGenerator(renderer), env = new THREE.Scene(); env.background = new THREE.Color(0x06030a);
   const panel = (c, k, x, y, z, w, h) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), side: THREE.DoubleSide })); m.position.set(x, y, z); m.lookAt(0, 0, 0); env.add(m); };
   panel('#ff2a4a', 3, -10, 3, 0, 6, 2); panel('#ff4fd8', 2, 8, 4, -6, 5, 2); panel('#3ad7ff', 2, 6, 3, 8, 4, 2); panel('#ffb070', 2.5, -6, 6, -8, 8, 4); panel('#ffcc33', 2, 0, 9, 10, 6, 2); panel('#2a1a3a', 1, 0, 14, 0, 30, 30);
   world.environment = pm.fromScene(env, 0.03).texture; pm.dispose(); }
-world.add(new THREE.HemisphereLight(0x8a7aaa, 0x2a1418, 0.6));
+world.add(new THREE.HemisphereLight(0x9baccb, 0x30202a, 0.8));
 const moon = new THREE.DirectionalLight(0xb8c4ff, 0.7); moon.castShadow = true; moon.shadow.mapSize.set(2048, 2048);
 Object.assign(moon.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 200 }); moon.shadow.bias = -0.0005; moon.shadow.normalBias = 0.03; world.add(moon, moon.target);
 const D = buildDistrict(world);
+const visuals = buildVisuals(world, D);
 const traffic = new Traffic(world, D.signals);
 const peds = new Pedestrians(world, D.walks, TOUCH ? 18 : 30);
 for (const p of D.parked) { const c = carModel(p.color); c.position.set(p.x, 0, p.z); c.rotation.y = p.ry + Math.PI / 2; world.add(c); }
@@ -87,6 +93,14 @@ const SC = {
   studio: { scene: studio, exposure: 0.9, colliders: [], circles: [], bounds: { minX: -6.5, maxX: 6.5, minZ: -2.2, maxZ: 7.5 }, exit: { x: 0, z: 7.2 }, zone: 'MVP Studios · Stage A' },
   club: { scene: club, exposure: 0.95, colliders: CLUB.colliders, circles: CLUB.circles, bounds: CLUB.bounds, exit: CLUB.exit, zone: 'The Velvet Room' },
 };
+// Preserve detail on oblique roads, shop signs and costume textures.
+const sampledTextures = new Set();
+for (const scene of [world, studio, club]) scene.traverse(object => {
+  for (const material of [].concat(object.material || [])) for (const field of ['map', 'bumpMap', 'roughnessMap', 'emissiveMap']) {
+    const texture = material[field];
+    if (texture && !sampledTextures.has(texture)) { texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); sampledTextures.add(texture); }
+  }
+});
 let where = 'world';
 renderPass.scene = world;
 
@@ -528,7 +542,7 @@ function update(dt) {
   updateNPCs(dt, T);
   if (!blocked) updMission(dt);
   if (where === 'world') {
-    traffic.update(dt, driving ? { x: 999, z: 999 } : P, [car, ...(chaser ? [chaser] : [])]); peds.update(dt, P, driving ? car : null); D.update(T);
+    traffic.update(dt, driving ? { x: 999, z: 999 } : P, [car, ...(chaser ? [chaser] : [])]); peds.update(dt, P, driving ? car : null); D.update(T, P);
     moon.position.set(P.x - 30, 60, P.z + 20); moon.target.position.set(P.x, 0, P.z);
     D.premiere.visible = (act && act.m.id === 'finale') || save.story >= 7;
     const z = D.zones.find(z => P.x > z.minX && P.x < z.maxX && P.z > z.minZ && P.z < z.maxZ); setZone(z ? z.name : 'The Strip');
@@ -555,6 +569,7 @@ function update(dt) {
     lookAt.set(P.x, 1.55, P.z).add(side); camera.fov = lerp(camera.fov, 58, Math.min(1, dt * 3));
   }
   if (shake > 0 && !reducedMotion) { camera.position.x += rand(-1, 1) * shake * 0.3; camera.position.y += rand(-1, 1) * shake * 0.2; shake = Math.max(0, shake - dt * 2); }
+  visuals.update(T, P, cam.yaw, where === 'world', reducedMotion);
   camera.lookAt(lookAt); camera.updateProjectionMatrix();
   renderer.toneMappingExposure = SC[where].exposure;
   $('#demo-guide').hidden = !DEMO || !!dialog;
@@ -574,10 +589,14 @@ function update(dt) {
 function applyQuality(value) {
   quality = value;
   const high = value === 'cinematic', low = value === 'performance';
-  renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1 : high ? 2 : 1.5));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1 : high ? (TOUCH ? 1.5 : 2) : (TOUCH ? 1.25 : 1.5)));
+  composer.setPixelRatio(renderer.getPixelRatio());
   renderer.shadowMap.enabled = !low;
   bloom.enabled = !low; bloom.strength = high ? 0.55 : 0.4;
-  bloom.threshold = 1.05; bloom.radius = 0.55;
+  bloom.threshold = 1.15; bloom.radius = 0.6;
+  gradePass.enabled = !low; gradePass.uniforms.amount.value = high ? .9 : .6;
+  visuals.mode = value; visuals.setQuality(value);
+  try { localStorage.setItem('mvp_graphics_quality', value); } catch (_) {}
   resize();
   $('#quality').textContent = value.toUpperCase();
 }
@@ -588,7 +607,7 @@ $('#quality').addEventListener('click', () => {
 function demoTitle() {
   demoStarted = false;
   panelCard('MVP MEDIA · PLAYABLE DEMO', 'Velvet Hours',
-    `<p class="demo-tag">Own the frame. Then own the film.</p><p>Las Vegas. 11:40 PM. A borrowed lens, a motel room, and one call that could change everything.</p><p>You are Matthew “MVP” Phillips. Meet Ruby at The Velvet Room and deliver four headliner photographs. Your first client. Your first credit.</p><div class="demo-facts"><span>01 / PHOTOGRAPHY</span><span>02 / THE STRIP</span><span>03 / YOUR FIRST PAYDAY</span></div><p class="muted">Early playable prototype · procedural characters · mature themes, non-explicit visuals. Desktop and touch controls. Progress is separate from the campaign.</p>`,
+    `<img class="demo-cover" src="../assets/mvp-media-title.jpeg" alt="MVP and Ruby — MVP Media studio campaign artwork" width="1536" height="864"><p class="demo-tag">Own the frame. Then own the film.</p><p>Las Vegas. 11:40 PM. A borrowed lens, a motel room, and one call that could change everything.</p><p>You are Matthew “MVP” Phillips. Meet Ruby at The Velvet Room and deliver four headliner photographs. Your first client. Your first credit.</p><div class="demo-facts"><span>01 / PHOTOGRAPHY</span><span>02 / THE STRIP</span><span>03 / YOUR FIRST PAYDAY</span></div><p class="muted">Early playable prototype · procedural characters · mature themes, non-explicit visuals. Desktop and touch controls. Progress is separate from the campaign.</p>`,
     [[save.story >= 1 ? 'Explore after the assignment' : 'Start the assignment', () => beginDemo(false)],
      ...(save.story >= 1 ? [['Replay Velvet Hours', () => beginDemo(true), { plain: true }]] : [])], true);
 }
@@ -618,11 +637,13 @@ let contextLost = false;
 canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); contextLost = true; $('#loading').textContent = 'Graphics interrupted. Reload to restore your saved progress.'; $('#loading').hidden = false; });
 
 // ---------- loop
-function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); composer.setSize(w, h); bloom.resolution.set(w / 2, h / 2); camera.aspect = w / h; camera.updateProjectionMatrix(); const ms = Math.round(Math.min(170, w * 0.28) * Math.min(devicePixelRatio, 2)); map.width = map.height = ms; }
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); composer.setSize(w, h); bloom.resolution.set(w / 2, h / 2); edgePass.uniforms.resolution.value.set(1 / (w * renderer.getPixelRatio()), 1 / (h * renderer.getPixelRatio())); camera.aspect = w / h; gradePass.uniforms.aspect.value = w / h; camera.updateProjectionMatrix(); const ms = Math.round(Math.min(170, w * 0.28) * Math.min(devicePixelRatio, 2)); map.width = map.height = ms; }
 addEventListener('resize', resize); resize();
 const clock = new THREE.Clock();
 function frame() { requestAnimationFrame(frame); const dt = Math.min(clock.getDelta(), 0.05); if (document.hidden || contextLost) return; update(dt); pressed.clear(); composer.render(); }
-applyQuality(TOUCH ? 'performance' : 'balanced');
+let preferredQuality = 'balanced';
+try { const stored = localStorage.getItem('mvp_graphics_quality'); if (['performance', 'balanced', 'cinematic'].includes(stored)) preferredQuality = stored; } catch (_) {}
+applyQuality(preferredQuality);
 refreshHud(); $('#loading').hidden = true; if (DEMO) { demoStarted = true; update(0); demoTitle(); } frame();
 addEventListener('beforeunload', persist);
 window.__world = { P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update };

@@ -1,6 +1,8 @@
 // The playable district: Las Vegas Blvd x Fremont Ave at night. Units are metres; x = east, z = south.
 // Returns colliders, points of interest, walk paths and lanes for the simulation in main.js.
 import * as THREE from 'three';
+import { applySurface } from './materials.js';
+import { buildVelvetExterior } from './venue.js';
 import { mat, neon, signMesh, canvasTex, glowTex, M, Sc, Rt, boxG, cylG, sphG, planeG, makeDSLR } from '../../hd-demo/lib/characters.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -29,18 +31,19 @@ function asphaltMats() {
   rough.colorSpace = THREE.NoColorSpace; rough.wrapS = rough.wrapT = THREE.RepeatWrapping; rough.repeat.set(30, 30);
   const color = canvasTex(256, 256, (g) => { g.fillStyle = '#1c1a20'; g.fillRect(0, 0, 256, 256); for (let i = 0; i < 4000; i++) { const v = 20 + Math.random() * 22; g.fillStyle = `rgb(${v},${v},${v + 4})`; g.fillRect(Math.random() * 256, Math.random() * 256, 1.5, 1.5); } });
   color.wrapS = color.wrapT = THREE.RepeatWrapping; color.repeat.set(60, 60);
-  return new THREE.MeshStandardMaterial({ map: color, roughnessMap: rough, roughness: 0.48, metalness: 0.22, envMapIntensity: 1.35 });
+  return applySurface(new THREE.MeshStandardMaterial({ map: color, bumpMap: color, bumpScale: 0.022, roughnessMap: rough, roughness: 0.65, metalness: 0.1, envMapIntensity: 1.2 }), 'asphalt_02', 200, 200, .55);
 }
 function pavers() {
   const t = canvasTex(256, 256, (g) => { g.fillStyle = '#3a3238'; g.fillRect(0, 0, 256, 256); for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const v = 58 + Math.random() * 16; g.fillStyle = `rgb(${v},${v - 6},${v - 2})`; g.fillRect(x * 32 + 1.5, y * 32 + 1.5, 29, 29); } });
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(40, 40);
-  return new THREE.MeshStandardMaterial({ map: t, roughness: 0.6, metalness: 0.05 });
+  return applySurface(new THREE.MeshStandardMaterial({ map: t, roughness: .82, color: 0xaaa1a5 }), 'concrete_floor_02', 90, 90, .4);
 }
 
 export function buildDistrict(scene) {
   const colliders = [], circles = [], pois = [], zones = [], spotLights = [];
   const box = (x0, x1, z0, z1) => colliders.push({ minX: Math.min(x0, x1), maxX: Math.max(x0, x1), minZ: Math.min(z0, z1), maxZ: Math.max(z0, z1) });
   const W = new THREE.Group(); scene.add(W);
+  const facadeBands = [];
 
   // ---------- ground: roads, sidewalks, markings
   const asphalt = asphaltMats();
@@ -75,6 +78,12 @@ export function buildDistrict(scene) {
     const fx = facadeMat(kind, d, h - (opts.ground ? 5 : 0)), fz = facadeMat(kind, w, h - (opts.ground ? 5 : 0));
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [fx, fx, roofM, roofM, fz, fz]); b.position.set((x0 + x1) / 2, y0 + h / 2, (z0 + z1) / 2); b.castShadow = b.receiveShadow = true; W.add(b);
     if (trim) for (const [x, z, ww, dd] of [[(x0 + x1) / 2, z0, w, 0.12], [(x0 + x1) / 2, z1, w, 0.12], [x0, (z0 + z1) / 2, 0.12, d], [x1, (z0 + z1) / 2, 0.12, d]]) W.add(M(boxG(ww + 0.12, 0.18, dd + 0.12), neon(trim, 4), x, y0 + h + 0.05, z));
+    // Floor reveals and a stone plinth add architectural depth to the flat facade.
+    facadeBands.push([(x0+x1)/2,y0+.42,z0,w,.7,.1],[(x0+x1)/2,y0+.42,z1,w,.7,.1]);
+    for(let floor=5;floor<h;floor+=4.5){
+      facadeBands.push([(x0+x1)/2,y0+floor,z0-.025,w,.12,.1],[(x0+x1)/2,y0+floor,z1+.025,w,.12,.1],
+        [x0-.025,y0+floor,(z0+z1)/2,.1,.12,d],[x1+.025,y0+floor,(z0+z1)/2,.1,.12,d]);
+    }
     if (!opts.noCollide) box(x0, x1, z0, z1);
     return b;
   }
@@ -84,6 +93,7 @@ export function buildDistrict(scene) {
     const len = horiz ? x1 - x0 : z1 - z0, sx = face === 'e' ? x1 : face === 'w' ? x0 : cx, sz = face === 's' ? z1 : face === 'n' ? z0 : cz;
     const out = { e: [1, 0], w: [-1, 0], s: [0, 1], n: [0, -1] }[face], ry = Math.atan2(out[0], out[1]);
     const g = new THREE.Group(); g.position.set(sx + out[0] * 0.02, 0, sz + out[1] * 0.02); g.rotation.y = ry; W.add(g);
+    if (opts.custom) return new THREE.Vector3(opts.door || 0, 0, 1.6).applyAxisAngle(new THREE.Vector3(0, 1, 0), ry).add(g.position);
     const glassT = canvasTex(512, 128, (c) => { const gr = c.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, color); gr.addColorStop(1, '#0a0608'); c.fillStyle = gr; c.fillRect(0, 0, 512, 128); c.globalAlpha = 0.35; for (let i = 0; i < 14; i++) { c.fillStyle = i % 2 ? '#fff' : '#000'; c.fillRect(Math.random() * 512, 40 + Math.random() * 70, 20 + Math.random() * 40, 30 + Math.random() * 40); } });
     const glass = new THREE.MeshStandardMaterial({ map: glassT, emissive: 0xffffff, emissiveMap: glassT, emissiveIntensity: 0.9, roughness: 0.08, metalness: 0.4 });
     g.add(M(planeG(len - 1.2, 3.6), glass, 0, 2.15, 0.06), M(boxG(len, 0.35, 0.3), mat('#0c0a0c', 0.4, 0.6), 0, 4.1, 0.15));
@@ -124,7 +134,9 @@ export function buildDistrict(scene) {
 
   // ---------- NE: Velvet Room, Lens & Light, Scarlet Lounge, hotel
   building(15, 42, -44, -14, 12, 'cool', '#ff2a4a');
-  const velvetDoor = shopfront(15, 42, -44, -14, 'w', 'THE VELVET ROOM', '#ff2a4a', { door: 2, signW: 13, signH: 2.4, signY: 7.2, awningC: '#5a0812' });
+  const velvetDoor = shopfront(15, 42, -44, -14, 'w', 'THE VELVET ROOM', '#ff2a4a', { door: 2, custom: true });
+  const velvetExterior = buildVelvetExterior(W);
+  box(14.35, 42, -44, -14); // align collision with the new facade; entrance trigger remains on the sidewalk
   for (let z = -36; z <= -29; z += 1.75) { W.add(M(cylG(0.05, 0.08, 1, 10), mat('#e8b64c', 0.2, 1), 12.6, 0.66, z), M(sphG(0.08, 8, 6), mat('#e8b64c', 0.2, 1), 12.6, 1.2, z)); }
   const rope = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([...Array(17)].map((_, i) => new THREE.Vector3(12.6, 1.08 - Math.abs(Math.sin(i / 16 * Math.PI * 4)) * 0.16, -36 + i * 7 / 16))), 64, 0.035, 8), mat('#8a0a14', 0.6)); W.add(rope);
   box(12.4, 12.8, -36, -29);
@@ -257,6 +269,9 @@ export function buildDistrict(scene) {
   const wallT = canvasTex(512, 256, (g) => { g.fillStyle = '#12060a'; g.fillRect(0, 0, 512, 256); g.font = '700 40px Cinzel, Georgia, serif'; g.textAlign = 'center'; for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { g.fillStyle = (x + y) % 2 ? '#e0202e' : '#f3e9e4'; g.fillText((x + y) % 2 ? 'MVP' : 'MEDIA', 64 + x * 128, 50 + y * 62); } });
   const sr = M(boxG(0.2, 3.4, 8), new THREE.MeshStandardMaterial({ map: wallT, roughness: 0.6 }), -32, 1.7, -50); premiere.add(sr);
   for (const z of [-51.8, -48.2]) for (let x = -30; x <= -18; x += 2.4) premiere.add(M(cylG(0.05, 0.08, 1, 10), mat('#e8b64c', 0.2, 1), x, 0.66, z));
+  const bands = new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),mat('#27252e',.6,.25),facadeBands.length);
+  facadeBands.forEach(([x,y,z,w,h,d],i)=>{o.position.set(x,y,z);o.rotation.set(0,0,0);o.scale.set(w,h,d);o.updateMatrix();bands.setMatrixAt(i,o.matrix);});
+  bands.receiveShadow=true;W.add(bands);
   // ---------- where people stand (story contacts) and the edge of the map
   const NPC = {
     ruby: { x: 12.3, z: -24.5, ry: -Math.PI / 2 }, bouncer: { x: 13.6, z: velvetDoor.z + 0.8, ry: -Math.PI / 2 }, tony: { x: 12.4, z: velvetDoor.z - 2.2, ry: -Math.PI / 2 },
@@ -270,7 +285,8 @@ export function buildDistrict(scene) {
   for (const p of parked) box(p.x - 1.05, p.x + 1.05, p.z - 2.3, p.z + 2.3);
   const myCarSpot = { x: 7.6, z: 31, a: Math.PI }; // heading north, kerbside outside MVP Studios
   const walks = [[12.6, -290, 12.6, -12], [12.6, 12, 12.6, 290], [-12.6, -290, -12.6, -12], [-12.6, 12, -12.6, 290], [-240, -10.8, -14, -10.8], [14, -10.8, 240, -10.8], [-240, 10.8, -14, 10.8], [14, 10.8, 240, 10.8]];
-  const update = (t) => {
+  const update = (t, player) => {
+    velvetExterior.update(t, player);
     jets.forEach((j, i) => { j.scale.y = 0.85 + Math.sin(t * 3 + i) * 0.15; });
     crown.rotation.y = t * 0.05;
     const on = Math.sin(t * 6) > 0; for (const b of blinkers) b.material.color.setRGB(on ? 3 : 0.2, on ? 1.8 : 0.1, 0);
