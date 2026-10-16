@@ -12,7 +12,7 @@ import { buildDistrict } from './lib/district.js';
 import { Traffic, Pedestrians, carModel } from './lib/npcs.js';
 import { buildClub } from './lib/club.js';
 import { PlayerCar, Chaser } from './lib/car.js';
-import { STORY, NPC_LOOKS, FREELANCE, FREE_LOOKS, GIG_SPOTS, GEAR, SETS, BUDGET, CALLS, FILM_TITLES } from './lib/story.js';
+import { STORY, NPC_LOOKS, FREELANCE, FREE_LOOKS, GIG_SPOTS, GEAR, SETS, BUDGET, CALLS, FILM_TITLES, RUNGS, ATTITUDE } from './lib/story.js';
 
 const $ = s => document.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -179,9 +179,11 @@ function completeMission() {
   const m = act.m, kind = act.kind; act = null; removeChaser();
   save.cash += m.reward.cash; addRep(m.reward.rep);
   if (m.reward.sign && !save.roster.includes(m.reward.sign)) save.roster.push(m.reward.sign);
+  const oldRung = RUNGS[Math.min(save.story, RUNGS.length - 1)][0];
   if (kind === 'story') save.story++;
+  const rung = RUNGS[Math.min(save.story, RUNGS.length - 1)];
   persist(); sfx('win'); refreshHud();
-  const extra = `<p class="money">+${fmt(m.reward.cash)} · +${m.reward.rep} rep${m.reward.sign ? ` · ${esc(C.TALENT[m.reward.sign].name)} signs with MVP Media` : ''}</p>`;
+  const extra = `<p class="money">+${fmt(m.reward.cash)} · +${m.reward.rep} rep${m.reward.sign ? ` · ${esc(C.TALENT[m.reward.sign].name)} signs with MVP Media` : ''}</p>${kind === 'story' && rung[0] !== oldRung ? `<p><b>Promoted: ${esc(rung[0])}</b> · ${esc(rung[1])}</p>` : ''}`;
   talk(m.outro || [], () => panelCard(kind === 'story' ? 'Mission complete' : 'Gig complete', m.title, extra, save.story >= STORY.length && kind === 'story' ? [['Roll credits', openEnding]] : [['Continue', closePanel]]));
   if (kind === 'gig' && freeModel) { const f = freeModel; setTimeout(() => { if (f.rig.root.parent) f.rig.root.parent.remove(f.rig.root); }, 4000); freeModel = null; }
 }
@@ -307,7 +309,7 @@ function panelCard(eyebrow, title, body, buttons, wide) {
 let zoneName = '';
 function setZone(name) { if (name === zoneName) return; zoneName = name; const z = $('#zone'); z.textContent = name; z.classList.remove('pop'); void z.offsetWidth; z.classList.add('pop'); }
 function refreshHud() {
-  $('#money').innerHTML = `<b>${fmt(save.cash)}</b><i>REP ${save.rep}</i>`;
+  $('#money').innerHTML = `<b>${fmt(save.cash)}</b><i>${esc(RUNGS[Math.min(save.story, RUNGS.length - 1)][0].toUpperCase())} · REP ${save.rep}</i>`;
   const st = step(), n = nextStory();
   $('#objective').textContent = st ? st.text : n ? (n.giver === 'phone' ? 'Answer the phone (PHONE / Tab)' : `${n.title}: meet ${n.who}`) : 'Run your empire: gigs, films, royalties';
 }
@@ -334,10 +336,17 @@ function openPhone() {
     ...(n && n.giver === 'phone' && !act ? [['Answer: ' + n.who, () => { closePanel(); sfx('phone'); talk(n.intro, () => startMission(n, 'story')); }]] : []),
     ['Photo gigs', openGigs, { plain: true, small: act ? 'Finish your current job first' : '', disabled: !!act }],
     ['Talent roster', openRoster, { plain: true }],
+    ['Catalog', openCatalog, { plain: true, small: save.releases.length ? `${save.releases.length} films · ${fmt(dailyRoyalty())}/day` : 'No releases yet' }],
     ['Studio productions', openStudio, { plain: true, small: save.studio ? (where === 'studio' ? '' : 'Go inside MVP Studios') : 'Buy the studio first' }],
     ['Save game', () => { persist(); toast('Saved.'); }, { plain: true }],
     ['Close', closePanel, { plain: true }],
   ]);
+}
+const bootleg = () => save.story === 6; // Silas is pirating the catalog until Bootleg Boulevard is won
+const dailyRoyalty = () => Math.round(save.releases.reduce((s, r) => s + r.royalty, 0) * (bootleg() ? 0.5 : 1));
+function openCatalog() {
+  const rows = save.releases.map(r => `<div><span>${esc(r.title)}</span><span>Q ${r.q} · ${fmt(r.royalty)}/day</span></div>`).join('');
+  panelCard('MVP Media', 'The catalog', `${rows ? `<div class="list">${rows}</div>` : '<p class="muted">Nothing released yet. Buy a room, cast it, light it, call it.</p>'}<p>Royalties <span class="money">${fmt(dailyRoyalty())}</span> per day${bootleg() ? ' · <b>bootlegs are eating half of it</b>' : ''}</p>`, [['Back', openPhone, { plain: true }]]);
 }
 function openGigs() {
   if (gigsDay !== save.day || !gigs.length) { gigs = [makeGig(), makeGig(), makeGig()]; gigsDay = save.day; }
@@ -345,10 +354,10 @@ function openGigs() {
 }
 function openRoster() {
   const btns = Object.entries(C.TALENT).map(([id, t]) => {
-    const signed = save.roster.includes(id), can = !signed && t.req > 0 && save.rep >= t.req && save.cash >= t.fee * 2;
-    return [`${esc(t.name)} <small>· ${t.age} · ${esc(t.role)}</small>`, () => { if (!can) return; save.cash -= t.fee * 2; save.roster.push(id); sfx('cash'); persist(); refreshHud(); openRoster(); }, { plain: true, sel: signed, disabled: !signed && !can, small: signed ? 'Under contract' : t.req === 0 ? 'Meet her in the story' : save.rep < t.req ? `Needs ${t.req} rep` : `Sign for ${fmt(t.fee * 2)}` }];
+    const signed = save.roster.includes(id), lexLock = id === 'lex' && save.releases.length < 2, can = !signed && !lexLock && t.req > 0 && save.rep >= t.req && save.cash >= t.fee * 2;
+    return [`${esc(t.name)} <small>· ${t.age} · ${esc(t.role)}</small>`, () => { if (!can) return; save.cash -= t.fee * 2; save.roster.push(id); sfx('cash'); persist(); refreshHud(); openRoster(); }, { plain: true, sel: signed, disabled: !signed && !can, small: signed ? 'Under contract' : t.req === 0 ? 'Meet her in the story' : lexLock ? 'Release 2 films first' : save.rep < t.req ? `Needs ${t.req} rep` : `Sign for ${fmt(t.fee * 2)}` }];
   });
-  panelCard('Talent roster', 'Who works with MVP Media', '<p class="muted">Every performer is an adult professional with ID on file, signed terms and a paid day rate.</p>', [...btns, ['Back', openPhone, { plain: true }]]);
+  panelCard('Talent roster', 'Who works with MVP Media', '<p class="muted">Everybody knows what they are worth. Rep opens doors, cash closes deals.</p>', [...btns, ['Back', openPhone, { plain: true }]]);
 }
 function openShop() {
   const btns = GEAR.map(g => { const lv = save.gear[g.id], cost = Math.round(g.base * Math.pow(1.8, lv)), max = lv >= g.max; return [`${g.name} <small>Lv ${lv}/${g.max} · ${g.desc}</small>`, () => { if (max || save.cash < cost) return; save.cash -= cost; save.gear[g.id]++; sfx('cash'); persist(); refreshHud(); openShop(); }, { plain: true, disabled: max || save.cash < cost, small: max ? 'Maxed' : fmt(cost) }]; });
@@ -371,15 +380,15 @@ function renderProd() {
   const cost = prodCost(), ok = prod.cast.length && save.cash >= cost, b = [];
   b.push([`Lights, camera, action <small>${fmt(cost)}</small>`, () => { if (!ok) return; save.cash -= cost; refreshHud(); prod.stage = 0; renderCall(); }, { disabled: !ok }]);
   for (const id of roster) b.push([`${esc(C.TALENT[id].name)} <small>${'★'.repeat(C.TALENT[id].star)}</small>`, () => { const i = prod.cast.indexOf(id); if (i >= 0) prod.cast.splice(i, 1); else if (prod.cast.length < 2) prod.cast.push(id); renderProd(); }, { plain: true, sel: prod.cast.includes(id), small: prod.story && id === 'jade' ? 'Working for points' : fmt(C.TALENT[id].fee) }]);
-  for (const [k, s] of Object.entries(SETS)) b.push([s.name, () => { prod.set = k; renderProd(); }, { plain: true, sel: prod.set === k, small: s.cost ? fmt(s.cost) : 'Free' }]);
+  for (const [k, s] of Object.entries(SETS)) b.push([s.name, () => { prod.set = k; renderProd(); }, { plain: true, sel: prod.set === k, small: (s.cost ? fmt(s.cost) : 'Free') + ' · ' + esc(s.look) }]);
   BUDGET.forEach((bu, i) => b.push([`${bu.name} crew`, () => { prod.budget = i; renderProd(); }, { plain: true, sel: prod.budget === i, small: bu.cost ? fmt(bu.cost) : 'Free' }]));
   if (!prod.story) b.push(['Cancel', closePanel, { plain: true }]);
-  panelCard('MVP Studios · pre-production', prod.story ? 'First feature' : 'New production', `<p class="muted">Pick up to 2 performers, a set and a crew. Closed set · IDs and contracts checked · intimacy coordinator on call.${save.cash < cost ? ` You need ${fmt(cost - save.cash)} more.` : ''}</p>`, b, true);
+  panelCard('MVP Studios · pre-production', prod.story ? 'First feature' : 'New production', `<p class="muted">Cast it, light it, call it, wrap it. Pick up to 2 performers, a set and a crew. ${esc(SETS[prod.set].look)}${save.cash < cost ? ` You need ${fmt(cost - save.cash)} more.` : ''}</p>`, b, true);
 }
 function renderCall() {
   const [key, label, opts] = CALLS[prod.stage];
   const hint = prod.cast.map(id => C.TALENT[id]).map(t => key === 'light' ? `${t.name.split(' ')[0]} looks best in ${t.light} light.` : key === 'mood' ? `${t.name.split(' ')[0]} is feeling ${t.mood} today.` : '').filter(Boolean).join(' ');
-  panelCard(`On set · ${SETS[prod.set].name}`, `Scene 1 · Take ${prod.stage + 1}`, `<p class="muted">Director's call: ${label}. ${esc(hint || 'Your call, director.')}</p>`, opts.map(o => [o[0].toUpperCase() + o.slice(1), () => { prod.calls[key] = o; prod.stage++; if (prod.stage < CALLS.length) renderCall(); else wrapProd(); }, { plain: true }]));
+  panelCard(`On set · ${SETS[prod.set].name}`, `Scene 1 · Take ${prod.stage + 1}`, `<p class="muted">Director's call: ${label}. ${esc(hint || 'Your call, director.')}</p>${prod.stage === 0 ? `<p class="muted">${esc(prod.cast.map(id => ATTITUDE[id]).filter(Boolean).join(' '))}</p>` : ''}`, opts.map(o => [o[0].toUpperCase() + o.slice(1), () => { prod.calls[key] = o; prod.stage++; if (prod.stage < CALLS.length) renderCall(); else wrapProd(); }, { plain: true }]));
 }
 function wrapProd() {
   const cast = prod.cast.map(id => C.TALENT[id]);
@@ -387,11 +396,11 @@ function wrapProd() {
   for (const t of cast) { if (t.light === prod.calls.light) q += 7; if (t.mood === prod.calls.mood) q += 7; }
   q += prod.calls.cam === 'dolly' ? 5 : prod.calls.cam === 'handheld' ? 3 : 1; q = Math.round(clamp(q * BUDGET[prod.budget].m, 10, 100));
   const gross = Math.round(q * (25 + save.rep) * 2.2), royalty = Math.round(gross * 0.08), title = FILM_TITLES[save.releases.length % FILM_TITLES.length] + (save.releases.length >= FILM_TITLES.length ? ' ' + (save.releases.length + 1) : '');
-  panelCard('Wrap', "Cut! That's a wrap.", `<p>Everyone hits their marks, the crew breaks down the lights, and the talent gets paid before they leave the lot.</p><h2>${esc(title)}</h2><p>Quality <b>${q}</b> / 100 · Opening sales <span class="money">${fmt(gross)}</span> · Royalties <span class="money">${fmt(royalty)}</span> per day</p>`,
+  panelCard('Wrap', "Cut! That's a wrap.", `<p>${q >= 75 ? 'The scene works. Everybody hit their marks and you can feel it in the dailies.' : q >= 50 ? 'Solid, sellable, nobody will remember it next year.' : 'It opens soft and dies at the box office. Listen to your talent next time.'}</p><h2>${esc(title)}</h2><p>Quality <b>${q}</b> / 100 · Opening sales <span class="money">${fmt(gross)}</span> · Royalties <span class="money">${fmt(royalty)}</span> per day</p>`,
     [['Release it', () => { save.cash += gross; save.releases.push({ title, royalty, q }); save.lastProduce = save.day; addRep(q >= 70 ? 5 : 2); sfx('win'); persist(); closePanel(); refreshHud(); toast(`${title} is out. ${fmt(gross)} in opening sales.`); const st = step(); const wasStory = prod.story; prod = null; if (wasStory && st && st.t === 'produce') nextStep(); }]]);
 }
 function openEnding() {
-  panelCard('MVP MEDIA · Own the frame', 'From room 12 to the top of the Strip', `<p>The story is complete, but the city keeps going: gigs, films and royalties are still on the table.</p><p class="muted">${save.releases.length} films · ${save.shots} photos · ${fmt(save.cash)} in the bank</p>`, [['Keep playing', closePanel]]);
+  panelCard('MVP MEDIA · LAS VEGAS', 'The Underground Cut', `<p><b>Own the frame. Then own the film.</b></p><p>From room 12 at the Desert Rose to Mogul. The story is complete, but the city keeps going: gigs, films and royalties are still on the table.</p><p class="muted">${save.releases.length} films · ${save.shots} photos · ${fmt(save.cash)} in the bank</p>`, [['Keep playing', closePanel]]);
 }
 
 // ---------- collision + interaction
@@ -480,7 +489,7 @@ beacon.geometry.translate(0, 30, 0); world.add(beacon);
 const v3 = new THREE.Vector3(), lookAt = new THREE.Vector3(); let snapCam = true, shake = 0, T = 0;
 function update(dt) {
   T += dt;
-  save.minute += dt * 2; if (save.minute >= 1440) { save.minute -= 1440; save.day++; const roy = save.releases.reduce((s, r) => s + r.royalty, 0); if (roy) { save.cash += roy; toast(`Royalties: your films earned ${fmt(roy)} today`); sfx('cash'); refreshHud(); } }
+  save.minute += dt * 2; if (save.minute >= 1440) { save.minute -= 1440; save.day++; const roy = dailyRoyalty(); if (roy) { save.cash += roy; toast(`Royalties: your films earned ${fmt(roy)} today${bootleg() ? ' (bootlegs took half)' : ''}`); sfx('cash'); refreshHud(); } }
   const h = Math.floor(save.minute / 60), mi = Math.floor(save.minute % 60); $('#clock').textContent = `DAY ${save.day} · ${((h + 11) % 12) + 1}:${String(mi).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
   if (!save.introDone && T > 1.5 && !dialog) { save.introDone = true; persist(); const n = nextStory(); if (n && n.giver === 'phone' && !act) { sfx('phone'); talk(n.intro, () => startMission(n, 'story')); } }
   const blocked = !!dialog || !panel.hidden;

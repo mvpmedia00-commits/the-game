@@ -36,7 +36,7 @@ It's night on Las Vegas Blvd. Your phone rings: Tony Velvet needs marquee shots 
 | **Dee** | Runs Lens & Light, the camera shop. Sells your gear upgrades. | Lens & Light door |
 | **Nova Starr** (24) | Glamour and fashion model in a gold gown. Wants magazine covers. | Desert Rose pool |
 | **The Landlord** | Owns the Desert Rose. Knows the soundstage is for sale. | Room 12 |
-| **Jade Rivers** (31) | Veteran adult-film actress and director with strict professional rules: IDs checked, contracts signed, an intimacy coordinator on call, everyone paid. Your mentor. | Outside, then inside MVP Studios |
+| **Jade Rivers** (31) | Veteran adult-film actress and director. Twenty features, zero patience for bullshit. Your mentor. | Outside, then inside MVP Studios |
 | **Coco Bellamy** (28) | Burlesque performer at Scarlet Lounge. | Scarlet Lounge door |
 | **Alexis "Lex" Vaughn** (29) | Performer and streamer with her own company. Signs only with people who respect the paperwork. | Signable once you have enough reputation |
 | **Silas Crane** | Boss of the Neon Kings. Pirates your work. The final antagonist. | Behind the wheel in the finale |
@@ -199,7 +199,11 @@ You can make **one per in-game day**, inside MVP Studios.
    - Opening sales = quality × (25 + rep) × 2.2.
    - **Royalties** of 8% of opening sales arrive every day after.
 
-Every production is presented as a professional set: IDs checked, contracts signed, an intimacy coordinator on call, and talent paid before they leave. Scenes end at "Cut! That's a wrap."
+Productions are about the business: casting, sets, lighting, mood, camera and the box office. Scenes end at "Cut! That's a wrap." Each set is a look, and the look is the product.
+
+**The climb:** your rung shows in the HUD and rises with the story: Hired Lens, Vendor, Runner, Byline, Landlord, Producer, Distributor, Mogul.
+
+**Catalog:** the phone lists every release and its daily royalty. Until you win Bootleg Boulevard, Silas's bootlegs eat half your royalties. Lex will only sign once you have released 2 films.
 
 ---
 

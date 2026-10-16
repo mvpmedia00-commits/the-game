@@ -335,13 +335,13 @@ const TALENT = {
     bio: 'Built a following one sunset at a time. Wants magazine covers and is willing to work for them.',
     look: { skin: '#c48a64', hair: 'long', hairC: '#2a1a12', outfit: 'gown', color: '#e8b64c' } },
   jade: { name: 'Jade Rivers', age: 31, role: 'Adult film actress & director', star: 5, fee: 1500, light: 'cool', mood: 'dramatic', req: 0,
-    bio: 'Twelve years in the business, three awards, and a hard rule: closed sets, fair pay, everyone treated like a professional.',
+    bio: 'Twenty features, three awards, and zero patience for bullshit. On her set everybody hits their marks.',
     look: { skin: '#5a3626', hair: 'bob', hairC: '#0e0a0a', outfit: 'jump', color: '#1fa37a' } },
   coco: { name: 'Coco Bellamy', age: 28, role: 'Burlesque performer, Scarlet Lounge', star: 2, fee: 400, light: 'warm', mood: 'playful', req: 25,
     bio: 'Feathers, rhinestones and comic timing. The Scarlet Lounge crowd comes for her.',
     look: { skin: '#9a6040', hair: 'bun', hairC: '#3a1a10', outfit: 'dress', color: '#ff4fd8' } },
   lex: { name: 'Alexis "Lex" Vaughn', age: 29, role: 'Adult performer & streamer', star: 4, fee: 1100, light: 'neon', mood: 'dramatic', req: 45,
-    bio: 'Two million followers and her own production company. She signs with people who respect the paperwork.',
+    bio: 'Two million followers and her own production company. She only signs with people who have already proven they can sell.',
     look: { skin: '#e0b090', hair: 'long', hairC: '#d8c070', outfit: 'dress', color: '#3ad7ff' } },
 };
 const MVP_LOOK = { fem: false, skin: '#4a2a1c', color: '#b3121c', bottom: '#a8101a', outfit: 'suit', hair: 'braids', beret: true, beard: true, camera: true, scale: 1.06 };
