@@ -4,6 +4,7 @@ MVP Media's games, playable in the browser. No build step.
 
 | Folder | What it is |
 |---|---|
+| `world/` | The playable HD world: Las Vegas Blvd x Fremont Ave at night, third person, traffic and pedestrians, MVP Studios interior, starter mission with Ruby |
 | `hd-demo/` | HD character demo (three r160): studio and pool sets, bloom, spring-bone physics (Off / Natural / Xtreme), photo mode, drag-and-drop `.glb` loading |
 | `beyond-the-frame/` | MVP: Beyond the Frame, the 3D open-world prototype (desktop + iPhone touch controls) |
 | `assets/characters/` | Finished characters (`mvp.glb`, `ruby.glb`) that the demo loads automatically; see its README |
