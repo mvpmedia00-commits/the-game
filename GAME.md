@@ -119,6 +119,7 @@ The playable area is the crossing of **Las Vegas Blvd** (north–south, about 60
 - **Photo gigs:** three freelance jobs a day at the pool, the casino forecourt, under the billboard or the chapel. Some are timed rush jobs.
 - **Talent roster:** everyone you've signed and who is still available.
 - **Catalog:** every film you've released and what it earns per day.
+- **Step outside:** appears whenever you're indoors and takes you straight back to Las Vegas Blvd. Interiors also have a lit EXIT door: in the Velvet Room it's on the back wall behind where you come in, with red floor lights leading to it.
 - **Studio productions:** run once you own the studio and are inside it.
 - **Save game.**
 

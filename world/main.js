@@ -90,13 +90,20 @@ wet.collectGround(world);
 
 // ---------- interiors
 const studio = new THREE.Scene(); buildStudio(studio, true);
+{ const exitSign = C.signMesh('EXIT', '#ff2a3a', 1.4, 0.55); exitSign.position.set(0, 3.2, 8.75); exitSign.rotation.y = Math.PI; studio.add(exitSign);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.8, 0.1), new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.5, metalness: 0.6 })); door.position.set(0, 1.4, 8.85); studio.add(door); }
 { const pm = new THREE.PMREMGenerator(renderer); studio.environment = pm.fromScene(new RoomEnvironment(renderer), 0.04).texture; pm.dispose(); }
 studio.traverse(o => { if (o.isLight) o.intensity *= o.isSpotLight || o.isPointLight ? Math.PI * 4 : Math.PI; });
 const club = new THREE.Scene(); const CLUB = buildClub(club);
-{ const pm = new THREE.PMREMGenerator(renderer); club.environment = pm.fromScene(new RoomEnvironment(renderer), 0.04).texture; pm.dispose(); club.environmentIntensity = 0.3; }
+// The club reflects its own room: dark velvet with the stage neon and the bar glow, not a bright white studio.
+{ const pm = new THREE.PMREMGenerator(renderer), env = new THREE.Scene(); env.background = new THREE.Color(0x080204);
+  const panel = (c, k, x, y, z, w, h) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), side: THREE.DoubleSide })); m.position.set(x, y, z); m.lookAt(0, 0, 0); env.add(m); };
+  panel('#3a0610', 0.6, 0, 3, -14, 26, 8); panel('#3a0610', 0.6, -13, 3, 0, 30, 8); panel('#3a0610', 0.6, 13, 3, 0, 30, 8); panel('#3a0610', 0.5, 0, 3, 14, 26, 8);
+  panel('#ff2a4a', 3, 0, 1, -7, 7, 0.4); panel('#ff4fd8', 2, 0, 6, -10, 8, 1.4); panel('#ffb060', 2.2, 11, 2.5, 2, 1, 6); panel('#ff2a3a', 2, 0, 3.6, 14, 1.6, 0.6); panel('#ffffff', 1.4, 0, 7.6, -2, 1, 1);
+  club.environment = pm.fromScene(env, 0.04).texture; pm.dispose(); }
 const SC = {
   world: { scene: world, exposure: 0.85, colliders: D.colliders, circles: D.circles },
-  studio: { scene: studio, exposure: 0.9, colliders: [], circles: [], bounds: { minX: -6.5, maxX: 6.5, minZ: -2.2, maxZ: 7.5 }, exit: { x: 0, z: 7.2 }, zone: 'MVP Studios · Stage A' },
+  studio: { scene: studio, exposure: 0.9, colliders: [], circles: [], bounds: { minX: -6.5, maxX: 6.5, minZ: -2.2, maxZ: 7.5 }, exit: { x: 0, z: 7.2, r: 3 }, zone: 'MVP Studios · Stage A' },
   club: { scene: club, exposure: 0.95, colliders: CLUB.colliders, circles: CLUB.circles, bounds: CLUB.bounds, exit: CLUB.exit, zone: 'The Velvet Room' },
 };
 // Preserve detail on oblique roads, shop signs and costume textures.
@@ -289,7 +296,8 @@ function enter(name, from) {
     where = name; renderPass.scene = SC[name].scene; SC[name].scene.add(mvp.root);
     if (name === 'studio') { P.x = 0; P.z = 5.6; P.a = P.ry = Math.PI; cam.yaw = 0; }
     else if (name === 'club') { P.x = 0; P.z = 11.5; P.a = P.ry = Math.PI; cam.yaw = 0; cam.pitch = 0.18; }
-    else { const d = from === 'club' ? D.pois.find(p => p.id === 'velvet') : D.pois.find(p => p.id === 'studio'); P.x = d.x - 1; P.z = d.z; P.a = P.ry = -Math.PI / 2; cam.yaw = Math.PI / 2; }
+    else { const d = from === 'club' ? D.pois.find(p => p.id === 'velvet') : D.pois.find(p => p.id === 'studio'); P.x = d.x - 1; P.z = d.z + d.r + 0.8; P.a = P.ry = -Math.PI / 2; cam.yaw = Math.PI / 2; }
+    doorLock = performance.now() + 1000;
     springs.joints.forEach(j => j.init = false); snapCam = true;
     const st = step(); if (st && st.t === 'enter' && st.scene === name) nextStep();
     f.classList.remove('on'); refreshHud();
@@ -375,6 +383,7 @@ function openPhone() {
     ['Talent roster', openRoster, { plain: true }],
     ['Catalog', openCatalog, { plain: true, small: save.releases.length ? `${save.releases.length} films · ${fmt(dailyRoyalty())}/day` : 'No releases yet' }],
     ['Studio productions', openStudio, { plain: true, small: save.studio ? (where === 'studio' ? '' : 'Go inside MVP Studios') : 'Buy the studio first' }],
+    ...(where !== 'world' ? [['Step outside to Las Vegas Blvd', () => { closePanel(); enter('world', where); }, { plain: true }]] : []),
     ['Save game', () => { persist(); toast('Saved.'); }, { plain: true }],
     ['Close', closePanel, { plain: true }],
   ]);
@@ -472,7 +481,7 @@ function interaction() {
   const add = (d, prompt, fn, key) => opts.push({ d, prompt, fn, key });
   if (driving) return { prompt: 'Get out of the car', fn: exitCar, key: 'F' };
   if (where !== 'world') {
-    const ex = SC[where].exit; if (near(ex.x, ex.z, 2.2)) add(0, 'Exit to Las Vegas Blvd', () => enter('world', where));
+    const ex = SC[where].exit; if (performance.now() > doorLock && near(ex.x, ex.z, ex.r || 2.2)) add(0, 'Exit to Las Vegas Blvd', () => enter('world', where));
     if (where === 'studio' && st && st.t === 'produce') { const j = NPCS.jade; if (j.place && j.place.scene === 'studio' && near(j.x, j.z, 3)) add(0.5, 'Talk to Jade: start the production', () => startProduction(true)); }
     return opts.sort((a, b) => a.d - b.d)[0] || null;
   }
@@ -483,7 +492,7 @@ function interaction() {
   if (!(n && n.giver === 'dee' && !act)) { const p = NPCS.dee; if (Math.hypot(P.x - p.x, P.z - p.z) < 2.8) add(0.8, "Shop at Dee's counter", openShop); }
   chat('bouncer', 'the bouncer', [['Bouncer', save.story >= 1 || (act && act.m.id === 'velvet') ? 'Go on in, MVP. Ruby is on.' : 'Headliner goes on at midnight. You on the list?']]);
   chat('tony', 'Tony Velvet', [['Tony Velvet', save.story >= 2 ? 'Marquee looks incredible. You are family here now.' : 'Get inside and shoot my headliner!']]);
-  for (const p of D.pois) { const d = Math.hypot(P.x - p.x, P.z - p.z); if (d < p.r) {
+  for (const p of D.pois) { const d = Math.hypot(P.x - p.x, P.z - p.z); if (d < p.r && performance.now() > doorLock) {
     if (p.id === 'studio') add(d, save.studio ? 'Enter MVP Studios' : 'MVP Studios · for sale', () => save.studio ? enter('studio') : talk([['Sign', 'FOR SALE · Soundstage · $3,500 · ask at the Desert Rose office']]));
     else if (p.id === 'velvet') add(d, 'Enter The Velvet Room', () => enter('club'));
     else if (p.id === 'room12') add(d, 'Room 12 · save game', () => { persist(); toast('Game saved in Room 12.'); });
@@ -524,7 +533,7 @@ function drawMap(target) {
 const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 60, 20, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.5, 0.25, 0.3), transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
 beacon.geometry.translate(0, 30, 0); world.add(beacon);
 const v3 = new THREE.Vector3(), lookAt = new THREE.Vector3(); let snapCam = true, shake = 0, T = 0;
-let debugCam = null;
+let debugCam = null, doorLock = 0;
 function update(dt) {
   if (DEMO && !demoStarted) return;
   if (DEMO && !panel.hidden) { if ((pressed.has('Escape') || pressed.has('Tab')) && panel.dataset.dismissible === 'true') closePanel(); return; }
@@ -575,6 +584,8 @@ function update(dt) {
   } else {
     let dist = cam.dist * (where === 'world' ? 1 : 0.95);
     if (where === 'world') for (let s = 0.4; s < dist; s += 0.25) { const x = P.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * s, z = P.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * s; if (insideAny(x, z)) { dist = Math.max(0.8, s - 0.35); break; } }
+    else { const b = SC[where].bounds, m = 0.3; // interiors: keep the camera inside the room's walls
+      for (let s = 0.4; s < dist; s += 0.2) { const x = P.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * s, z = P.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * s; if (x < b.minX - m || x > b.maxX + m || z < b.minZ - m || z > b.maxZ + m) { dist = Math.max(0.7, s - 0.25); break; } } }
     const side = new THREE.Vector3(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)).multiplyScalar(0.45);
     v3.set(P.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * dist, 1.55 + Math.sin(cam.pitch) * dist, P.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * dist).add(side);
     if (snapCam) { camera.position.copy(v3); snapCam = false; } else camera.position.lerp(v3, 1 - Math.exp(-dt * 12));
@@ -644,7 +655,7 @@ function openDemoMenu() {
   if (!panel.hidden) return closePanel();
   panelCard('MVP PHONE · DEMO', 'Tonight’s assignment',
     `<p>${esc(save.story >= 1 ? 'Velvet Hours complete. The district is yours to explore.' : step()?.text || 'Meet Ruby at The Velvet Room.')}</p><p class="muted">Move: WASD / left thumb. Look: mouse / right thumb. E / ACT: interact. P / SHOOT: photo. F / CAR: drive. Graphics: tap the quality label.</p>`,
-    [['Resume', closePanel], ['Replay from the beginning', () => beginDemo(true), { plain: true }], ['Save progress', () => { persist(); closePanel(); toast('Demo progress saved.'); }, { plain: true }]]);
+    [['Resume', closePanel], ...(where !== 'world' ? [['Step outside to Las Vegas Blvd', () => { closePanel(); enter('world', where); }, { plain: true }]] : []), ['Replay from the beginning', () => beginDemo(true), { plain: true }], ['Save progress', () => { persist(); closePanel(); toast('Demo progress saved.'); }, { plain: true }]]);
   panel.dataset.dismissible = 'true';
 }
 let contextLost = false;
@@ -660,4 +671,4 @@ try { const stored = localStorage.getItem('mvp_graphics_quality'); if (['perform
 applyQuality(preferredQuality);
 refreshHud(); $('#loading').hidden = true; if (DEMO) { demoStarted = true; update(0); demoTitle(); } frame();
 addEventListener('beforeunload', persist);
-window.__world = { set debugCam(v) { debugCam = v; }, probe() { const r = renderer, out = {}; r.info.autoReset = false; const count = (k, f) => { r.info.reset(); f(); out[k] = r.info.render.calls; }; count('main', () => r.render(world, camera)); count('reflect', () => wet.render(renderer, world, camera)); const by = {}; world.traverse(o => { if (o.isMesh || o.isSprite || o.isPoints) { let p = o; while (p.parent && p.parent !== world) p = p.parent; const k = (p.name || p.type) + ':' + (o.isSprite ? 'sprite' : o.isInstancedMesh ? 'inst' : 'mesh'); by[k] = (by[k] || 0) + (Array.isArray(o.material) ? o.material.length : 1); } }); out.by = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 14); r.info.autoReset = true; return out; }, renderFrame() { if (where === 'world') wet.render(renderer, world, camera); composer.render(); }, P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update };
+window.__world = { SC, set debugCam(v) { debugCam = v; }, probe() { const r = renderer, out = {}; r.info.autoReset = false; const count = (k, f) => { r.info.reset(); f(); out[k] = r.info.render.calls; }; count('main', () => r.render(world, camera)); count('reflect', () => wet.render(renderer, world, camera)); const by = {}; world.traverse(o => { if (o.isMesh || o.isSprite || o.isPoints) { let p = o; while (p.parent && p.parent !== world) p = p.parent; const k = (p.name || p.type) + ':' + (o.isSprite ? 'sprite' : o.isInstancedMesh ? 'inst' : 'mesh'); by[k] = (by[k] || 0) + (Array.isArray(o.material) ? o.material.length : 1); } }); out.by = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 14); r.info.autoReset = true; return out; }, renderFrame() { if (where === 'world') wet.render(renderer, world, camera); composer.render(); }, P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update };
