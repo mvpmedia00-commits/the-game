@@ -30,3 +30,9 @@ Bones whose names contain these words get spring physics automatically:
 | earring, hoop | earrings |
 
 Character Creator 4 names its chest bones `CC_Base_L_Breast` / `CC_Base_R_Breast`, so they are picked up with no extra setup.
+
+## Current files
+
+| File | Source | Notes |
+|---|---|---|
+| `ruby.glb` | Tripo AI (HD model), by Matthew | Shrunk from 61.5 MB / 2M triangles to 0.78 MB / 58k triangles (weld, simplify, 2K WebP textures, meshopt). **No skeleton yet**, so she stands still. Re-export from Tripo with **Rig** turned on to make her walk, pose and dance. |
