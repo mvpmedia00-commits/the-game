@@ -6,8 +6,9 @@ A third-person, open-world crime-and-hustle game set in a fictional, after-hours
 
 The game is about the business of nightlife: club promos, magazine covers, red carpets and film production. It is played through photography, driving and deal-making.
 
-- **Rating intent:** mature themes, non-explicit. Productions cut to "That's a wrap." Every performer is a named adult professional with a contract and a paid day rate.
-- **Platform:** plays in the browser today (Chrome, Safari, iPhone). Targeted at Steam.
+- **This cut:** *The Underground Cut*, the adult-rated version: profanity, adult-industry business and attitude. What's on screen is not explicit; productions cut to "That's a wrap." Every performer is a named adult (24 or older).
+- **A safe (PG-13) version** will be built later from the same world.
+- **Platform:** plays in the browser today (Chrome, Safari, iPhone). Targeted at Steam (Adult Only listing) and the MVP Media website.
 
 ---
 
@@ -38,7 +39,7 @@ It's night on Las Vegas Blvd. Your phone rings: Tony Velvet needs marquee shots 
 | **The Landlord** | Owns the Desert Rose. Knows the soundstage is for sale. | Room 12 |
 | **Jade Rivers** (31) | Veteran adult-film actress and director. Twenty features, zero patience for bullshit. Your mentor. | Outside, then inside MVP Studios |
 | **Coco Bellamy** (28) | Burlesque performer at Scarlet Lounge. | Scarlet Lounge door |
-| **Alexis "Lex" Vaughn** (29) | Performer and streamer with her own company. Signs only with people who respect the paperwork. | Signable once you have enough reputation |
+| **Alexis "Lex" Vaughn** (29) | Performer and streamer with her own company. Signs only with producers who have proven they can sell. | Signable after 2 released films and 45 rep |
 | **Silas Crane** | Boss of the Neon Kings. Pirates your work. The final antagonist. | Behind the wheel in the finale |
 | **The Bouncer** | Guards the Velvet Room door. | Club door |
 
@@ -117,6 +118,7 @@ The playable area is the crossing of **Las Vegas Blvd** (north–south, about 60
 - **Story:** all 8 missions, which are done, and who to see next.
 - **Photo gigs:** three freelance jobs a day at the pool, the casino forecourt, under the billboard or the chapel. Some are timed rush jobs.
 - **Talent roster:** everyone you've signed and who is still available.
+- **Catalog:** every film you've released and what it earns per day.
 - **Studio productions:** run once you own the studio and are inside it.
 - **Save game.**
 
@@ -179,7 +181,7 @@ The playable area is the crossing of **Las Vegas Blvd** (north–south, about 60
 | Nova Starr | 3 | $700 | warm light, romantic | Mission 4 |
 | Jade Rivers | 5 | $1,500 | cool light, dramatic | Mission 6 |
 | Coco Bellamy | 2 | $400 | warm light, playful | Mission 7, or 25 rep + $800 |
-| Alexis "Lex" Vaughn | 4 | $1,100 | neon light, dramatic | 45 rep + $2,200 |
+| Alexis "Lex" Vaughn | 4 | $1,100 | neon light, dramatic | 2 released films + 45 rep + $2,200 |
 
 ### Studio productions
 You can make **one per in-game day**, inside MVP Studios.
@@ -238,7 +240,7 @@ Productions are about the business: casting, sets, lighting, mood, camera and th
 
 | Folder | Contents |
 |---|---|
-| `world/` | **This game**: the district, driving, interiors, 8 missions, business systems |
+| `world/` | **This game**: the district, driving, interiors, 8 missions, business systems. See [CODE.md](CODE.md) for how the code works |
 | `hd-demo/` | Character showroom: studio and pool sets, physics slider, drag-and-drop `.glb` loading |
 | `beyond-the-frame/` | The earlier prototype (the same story in a 2D/3D city) |
 | `assets/characters/` | Drop-in spot for real character models (`mvp.glb`, `ruby.glb`) |
