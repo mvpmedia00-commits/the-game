@@ -29,7 +29,7 @@ function asphaltMats() {
   rough.colorSpace = THREE.NoColorSpace; rough.wrapS = rough.wrapT = THREE.RepeatWrapping; rough.repeat.set(30, 30);
   const color = canvasTex(256, 256, (g) => { g.fillStyle = '#1c1a20'; g.fillRect(0, 0, 256, 256); for (let i = 0; i < 4000; i++) { const v = 20 + Math.random() * 22; g.fillStyle = `rgb(${v},${v},${v + 4})`; g.fillRect(Math.random() * 256, Math.random() * 256, 1.5, 1.5); } });
   color.wrapS = color.wrapT = THREE.RepeatWrapping; color.repeat.set(60, 60);
-  return new THREE.MeshStandardMaterial({ map: color, roughnessMap: rough, roughness: 1, metalness: 0.15, envMapIntensity: 1.1 });
+  return new THREE.MeshStandardMaterial({ map: color, roughnessMap: rough, roughness: 0.48, metalness: 0.22, envMapIntensity: 1.35 });
 }
 function pavers() {
   const t = canvasTex(256, 256, (g) => { g.fillStyle = '#3a3238'; g.fillRect(0, 0, 256, 256); for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const v = 58 + Math.random() * 16; g.fillStyle = `rgb(${v},${v - 6},${v - 2})`; g.fillRect(x * 32 + 1.5, y * 32 + 1.5, 29, 29); } });

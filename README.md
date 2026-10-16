@@ -1,4 +1,6 @@
-# the-game
+# MVP Media: Las Vegas — The Underground Cut
+
+**Start with the playable demo:** serve this repository and open `/world/?demo=1`, or use the landing page at `/`. See [DEMO.md](DEMO.md) for scope, controls, validation, and known limitations.
 
 MVP Media's games, playable in the browser. No build step. **Read [GAME.md](GAME.md) for the full game guide [STORE.md](STORE.md) for the store page copy, and [CODE.md](CODE.md) for how the code works.**
 

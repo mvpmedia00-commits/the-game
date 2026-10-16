@@ -24,6 +24,10 @@ const fmt = n => '$' + Math.round(n).toLocaleString('en-US');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const onSidewalk = (x, z) => Math.abs(x) > 10.1 && Math.abs(z) > 8.1;
 const canvas = $('#view');
+const DEMO = new URLSearchParams(location.search).get('demo') === '1';
+let demoStarted = !DEMO;
+let quality = 'balanced';
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TOUCH = matchMedia('(pointer: coarse)').matches;
 if (TOUCH) document.body.classList.add('touch');
 
@@ -87,7 +91,7 @@ let where = 'world';
 renderPass.scene = world;
 
 // ---------- save
-const SAVE_KEY = 'mvp_world_v2';
+const SAVE_KEY = DEMO ? 'mvp_velvet_demo_v1' : 'mvp_world_v2';
 const fresh = () => ({ cash: 250, rep: 0, story: 0, studio: false, roster: [], gear: { stab: 0, lens: 0, light: 0, ride: 0 }, releases: [], day: 1, minute: 23 * 60 + 40, lastProduce: 0, shots: 0, introDone: false });
 let save = fresh();
 try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s) { save = Object.assign(fresh(), s); save.gear = Object.assign(fresh().gear, s.gear || {}); } } catch (e) {}
@@ -112,7 +116,7 @@ let driving = false;
 let act = null; // { m, kind, i, timer, shots, lost }
 const SPOTS = () => ({ velvet: D.pois.find(p => p.id === 'velvet'), poolspot: D.pois.find(p => p.id === 'poolspot'), editor: { ...D.NPC.editor, r: 3 }, carpet: { x: -20, z: D.NPC.carpet.z, r: 4 }, billboard: { x: 11.5, z: -18, r: 3 }, chapel: { x: 12.6, z: 70, r: 3 } });
 const step = () => act ? act.m.steps[act.i] : null;
-const nextStory = () => STORY[save.story];
+const nextStory = () => DEMO && save.story >= 1 ? null : STORY[save.story];
 
 // Where each named character stands right now, given story progress.
 function placement(id) {
@@ -166,7 +170,7 @@ function updateNPCs(dt, t) {
 }
 
 // ---------- missions
-function startMission(m, kind) { act = { m, kind, i: -1, timer: null, shots: [] }; nextStep(); }
+function startMission(m, kind) { if (DEMO && kind === 'story' && m.id !== 'velvet') return; act = { m, kind, i: -1, timer: null, shots: [] }; nextStep(); }
 function nextStep() {
   act.i++; act.timer = null; act.shots = []; removeChaser();
   if (act.i >= act.m.steps.length) return completeMission();
@@ -181,6 +185,10 @@ function completeMission() {
   if (m.reward.sign && !save.roster.includes(m.reward.sign)) save.roster.push(m.reward.sign);
   const oldRung = RUNGS[Math.min(save.story, RUNGS.length - 1)][0];
   if (kind === 'story') save.story++;
+  if (DEMO && kind === 'story' && m.id === 'velvet') {
+    persist(); sfx('win'); refreshHud();
+    return talk(m.outro || [], demoComplete);
+  }
   const rung = RUNGS[Math.min(save.story, RUNGS.length - 1)];
   persist(); sfx('win'); refreshHud();
   const extra = `<p class="money">+${fmt(m.reward.cash)} · +${m.reward.rep} rep${m.reward.sign ? ` · ${esc(C.TALENT[m.reward.sign].name)} signs with MVP Media` : ''}</p>${kind === 'story' && rung[0] !== oldRung ? `<p><b>Promoted: ${esc(rung[0])}</b> · ${esc(rung[1])}</p>` : ''}`;
@@ -268,7 +276,9 @@ const keys = new Set(), pressed = new Set();
 let locked = false;
 addEventListener('keydown', e => { initAudio(); if (e.repeat) return; keys.add(e.code); pressed.add(e.code); if (['Space', 'ArrowUp', 'ArrowDown', 'Tab'].includes(e.code)) e.preventDefault(); });
 addEventListener('keyup', e => keys.delete(e.code));
-addEventListener('blur', () => keys.clear());
+function clearInput() { keys.clear(); pressed.clear(); stick.f = stick.r = 0; stick.id = look.id = null; $('#knob').style.transform = ''; $('#stick').classList.remove('on'); }
+addEventListener('blur', clearInput);
+document.addEventListener('visibilitychange', clearInput);
 canvas.addEventListener('mousedown', e => { initAudio(); if (e.button === 0 && !TOUCH && panel.hidden) { try { const r = canvas.requestPointerLock(); r && r.catch && r.catch(() => {}); } catch (err) {} } });
 document.addEventListener('pointerlockchange', () => { locked = document.pointerLockElement === canvas; });
 addEventListener('mousemove', e => { if (locked) { cam.yaw -= e.movementX * 0.0025; cam.pitch = clamp(cam.pitch + e.movementY * 0.002, -0.15, 1.1); cam.lastLook = T; } });
@@ -299,7 +309,7 @@ function advance() { sfx('click'); dialog.i++; if (dialog.i >= dialog.lines.leng
 $('#dialog').addEventListener('click', () => dialog && advance());
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 3400); }
 const panel = $('#panel'); let panelActs = [];
-function showPanel(html, acts) { try { document.exitPointerLock(); } catch (e) {} panel.innerHTML = html; panel.hidden = false; panelActs = acts || []; const b = panel.querySelector('button.b:not([disabled])'); b && b.focus({ preventScroll: true }); }
+function showPanel(html, acts) { try { document.exitPointerLock(); } catch (e) {} panel.innerHTML = html; panel.dataset.dismissible = 'false'; panel.hidden = false; panelActs = acts || []; const b = panel.querySelector('button.b:not([disabled])'); b && b.focus({ preventScroll: true }); }
 function closePanel() { panel.hidden = true; panel.innerHTML = ''; panelActs = []; }
 panel.addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b || b.disabled) return; sfx('click'); const fn = panelActs[+b.dataset.i]; fn && fn(b); });
 function panelCard(eyebrow, title, body, buttons, wide) {
@@ -328,6 +338,8 @@ function startGig(g) {
   gigs = gigs.filter(x => x !== g); closePanel(); startMission(g, 'gig');
 }
 function openPhone() {
+  if (DEMO && (!demoStarted || dialog)) return;
+  if (DEMO) return openDemoMenu();
   if (!panel.hidden) return closePanel();
   sfx('click');
   const n = nextStory(), st = step();
@@ -488,10 +500,12 @@ const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 60, 20, 1, tr
 beacon.geometry.translate(0, 30, 0); world.add(beacon);
 const v3 = new THREE.Vector3(), lookAt = new THREE.Vector3(); let snapCam = true, shake = 0, T = 0;
 function update(dt) {
+  if (DEMO && !demoStarted) return;
+  if (DEMO && !panel.hidden) { if ((pressed.has('Escape') || pressed.has('Tab')) && panel.dataset.dismissible === 'true') closePanel(); return; }
   T += dt;
   save.minute += dt * 2; if (save.minute >= 1440) { save.minute -= 1440; save.day++; const roy = dailyRoyalty(); if (roy) { save.cash += roy; toast(`Royalties: your films earned ${fmt(roy)} today${bootleg() ? ' (bootlegs took half)' : ''}`); sfx('cash'); refreshHud(); } }
   const h = Math.floor(save.minute / 60), mi = Math.floor(save.minute % 60); $('#clock').textContent = `DAY ${save.day} · ${((h + 11) % 12) + 1}:${String(mi).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
-  if (!save.introDone && T > 1.5 && !dialog) { save.introDone = true; persist(); const n = nextStory(); if (n && n.giver === 'phone' && !act) { sfx('phone'); talk(n.intro, () => startMission(n, 'story')); } }
+  if (!save.introDone && T > 1.5 && !dialog && panel.hidden) { save.introDone = true; persist(); const n = nextStory(); if (n && n.giver === 'phone' && !act) { sfx('phone'); talk(n.intro, () => startMission(n, 'story')); } }
   const blocked = !!dialog || !panel.hidden;
   let f = stick.f, r = stick.r;
   if (!blocked) { if (keys.has('KeyW') || keys.has('ArrowUp')) f += 1; if (keys.has('KeyS') || keys.has('ArrowDown')) f -= 1; if (keys.has('KeyD') || keys.has('ArrowRight')) r += 1; if (keys.has('KeyA') || keys.has('ArrowLeft')) r -= 1; } else { f = r = 0; }
@@ -529,7 +543,7 @@ function update(dt) {
     if (T - cam.lastLook > 1.4 && Math.abs(car.v) > 1) cam.yaw += angDiff(cam.yaw, car.a + Math.PI) * Math.min(1, dt * 3);
     const dist = 7.6 + Math.min(2.5, Math.abs(car.v) / 12);
     v3.set(car.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * dist, 1.6 + Math.sin(cam.pitch) * dist, car.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * dist);
-    if (snapCam) { camera.position.copy(v3); snapCam = false; } else camera.position.lerp(v3, Math.min(1, dt * 6));
+    if (snapCam) { camera.position.copy(v3); snapCam = false; } else camera.position.lerp(v3, 1 - Math.exp(-dt * 6));
     lookAt.set(car.x + Math.sin(car.a) * 2.5, 1.4, car.z + Math.cos(car.a) * 2.5);
     camera.fov = lerp(camera.fov, 60 + Math.min(14, Math.abs(car.v) * 0.5), Math.min(1, dt * 2));
   } else {
@@ -537,12 +551,18 @@ function update(dt) {
     if (where === 'world') for (let s = 0.4; s < dist; s += 0.25) { const x = P.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * s, z = P.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * s; if (insideAny(x, z)) { dist = Math.max(0.8, s - 0.35); break; } }
     const side = new THREE.Vector3(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)).multiplyScalar(0.45);
     v3.set(P.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * dist, 1.55 + Math.sin(cam.pitch) * dist, P.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * dist).add(side);
-    if (snapCam) { camera.position.copy(v3); snapCam = false; } else camera.position.lerp(v3, Math.min(1, dt * 12));
+    if (snapCam) { camera.position.copy(v3); snapCam = false; } else camera.position.lerp(v3, 1 - Math.exp(-dt * 12));
     lookAt.set(P.x, 1.55, P.z).add(side); camera.fov = lerp(camera.fov, 58, Math.min(1, dt * 3));
   }
-  if (shake > 0) { camera.position.x += rand(-1, 1) * shake * 0.3; camera.position.y += rand(-1, 1) * shake * 0.2; shake = Math.max(0, shake - dt * 2); }
+  if (shake > 0 && !reducedMotion) { camera.position.x += rand(-1, 1) * shake * 0.3; camera.position.y += rand(-1, 1) * shake * 0.2; shake = Math.max(0, shake - dt * 2); }
   camera.lookAt(lookAt); camera.updateProjectionMatrix();
   renderer.toneMappingExposure = SC[where].exposure;
+  $('#demo-guide').hidden = !DEMO || !!dialog;
+  if (DEMO) {
+    const target = objectiveTarget();
+    const distance = target && where === 'world' ? ` · ${Math.round(Math.hypot(P.x - target.x, P.z - target.z))} m` : '';
+    $('#demo-guide').textContent = save.story >= 1 ? 'Assignment complete · explore the district or replay from PHONE' : where === 'club' ? 'Frame Ruby with her head and feet visible. Press P or SHOOT. Take 4 photos.' : `Follow the gold beacon${distance} · E / ACT to enter · Shift to run`;
+  }
   const tgt = objectiveTarget(), st = step();
   beacon.visible = !!tgt && !(st && st.t === 'chase'); if (tgt) beacon.position.set(tgt.x, 0, tgt.z);
   drawMap(tgt);
@@ -550,11 +570,59 @@ function update(dt) {
   $('#grid').hidden = !(st && st.t === 'shoot' && st.scene === where);
 }
 
+// ---------- demo presentation (the campaign remains available without ?demo=1)
+function applyQuality(value) {
+  quality = value;
+  const high = value === 'cinematic', low = value === 'performance';
+  renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1 : high ? 2 : 1.5));
+  renderer.shadowMap.enabled = !low;
+  bloom.enabled = !low; bloom.strength = high ? 0.55 : 0.4;
+  bloom.threshold = 1.05; bloom.radius = 0.55;
+  resize();
+  $('#quality').textContent = value.toUpperCase();
+}
+$('#quality').addEventListener('click', () => {
+  const modes = ['performance', 'balanced', 'cinematic'];
+  applyQuality(modes[(modes.indexOf(quality) + 1) % modes.length]);
+});
+function demoTitle() {
+  demoStarted = false;
+  panelCard('MVP MEDIA · PLAYABLE DEMO', 'Velvet Hours',
+    `<p class="demo-tag">Own the frame. Then own the film.</p><p>Las Vegas. 11:40 PM. A borrowed lens, a motel room, and one call that could change everything.</p><p>You are Matthew “MVP” Phillips. Meet Ruby at The Velvet Room and deliver four headliner photographs. Your first client. Your first credit.</p><div class="demo-facts"><span>01 / PHOTOGRAPHY</span><span>02 / THE STRIP</span><span>03 / YOUR FIRST PAYDAY</span></div><p class="muted">Early playable prototype · procedural characters · mature themes, non-explicit visuals. Desktop and touch controls. Progress is separate from the campaign.</p>`,
+    [[save.story >= 1 ? 'Explore after the assignment' : 'Start the assignment', () => beginDemo(false)],
+     ...(save.story >= 1 ? [['Replay Velvet Hours', () => beginDemo(true), { plain: true }]] : [])], true);
+}
+function beginDemo(reset) {
+  initAudio();
+  if (reset) { save = fresh(); act = null; removeChaser(); if (driving) exitCar();
+    SC[where].scene.remove(mvp.root); where = 'world'; world.add(mvp.root); renderPass.scene = world;
+    P.x = D.spawn.x; P.z = D.spawn.z; cam.yaw = D.spawn.yaw + Math.PI; cam.pitch = 0.28; snapCam = true;
+    car.x = D.myCarSpot.x; car.z = D.myCarSpot.z; car.a = D.myCarSpot.a; car.v = 0;
+    $('#strip').replaceChildren(); persist(); }
+  demoStarted = true; closePanel(); clearInput(); refreshHud();
+  if (save.story === 0 && !act) { save.introDone = true; talk(STORY[0].intro, () => startMission(STORY[0], 'story')); }
+}
+function demoComplete() {
+  panelCard('VELVET HOURS · ASSIGNMENT COMPLETE', 'Your name is on the marquee.',
+    `<p>You delivered Ruby’s headliner set and earned your first credit with MVP Media.</p><div class="demo-facts"><span>+$900 PAYDAY</span><span>+8 REPUTATION</span><span>RUBY SIGNED</span></div><p>The climb continues: deliver the proofs, land your first cover, buy a soundstage, and build a catalog you own. Silas Crane is already watching.</p><p class="muted">End of the demo story. Explore the district, take more photographs, or replay the assignment.</p>`,
+    [['Explore the district', closePanel], ['Replay assignment', () => beginDemo(true), { plain: true }]], true);
+}
+function openDemoMenu() {
+  if (!panel.hidden) return closePanel();
+  panelCard('MVP PHONE · DEMO', 'Tonight’s assignment',
+    `<p>${esc(save.story >= 1 ? 'Velvet Hours complete. The district is yours to explore.' : step()?.text || 'Meet Ruby at The Velvet Room.')}</p><p class="muted">Move: WASD / left thumb. Look: mouse / right thumb. E / ACT: interact. P / SHOOT: photo. F / CAR: drive. Graphics: tap the quality label.</p>`,
+    [['Resume', closePanel], ['Replay from the beginning', () => beginDemo(true), { plain: true }], ['Save progress', () => { persist(); closePanel(); toast('Demo progress saved.'); }, { plain: true }]]);
+  panel.dataset.dismissible = 'true';
+}
+let contextLost = false;
+canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); contextLost = true; $('#loading').textContent = 'Graphics interrupted. Reload to restore your saved progress.'; $('#loading').hidden = false; });
+
 // ---------- loop
 function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); composer.setSize(w, h); bloom.resolution.set(w / 2, h / 2); camera.aspect = w / h; camera.updateProjectionMatrix(); const ms = Math.round(Math.min(170, w * 0.28) * Math.min(devicePixelRatio, 2)); map.width = map.height = ms; }
 addEventListener('resize', resize); resize();
 const clock = new THREE.Clock();
-function frame() { requestAnimationFrame(frame); const dt = Math.min(clock.getDelta(), 0.05); update(dt); pressed.clear(); composer.render(); }
-refreshHud(); $('#loading').hidden = true; frame();
+function frame() { requestAnimationFrame(frame); const dt = Math.min(clock.getDelta(), 0.05); if (document.hidden || contextLost) return; update(dt); pressed.clear(); composer.render(); }
+applyQuality(TOUCH ? 'performance' : 'balanced');
+refreshHud(); $('#loading').hidden = true; if (DEMO) { demoStarted = true; update(0); demoTitle(); } frame();
 addEventListener('beforeunload', persist);
 window.__world = { P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update };

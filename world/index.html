@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>MVP Media: Las Vegas</title>
+<title>Velvet Hours · MVP Media: Las Vegas</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -79,6 +79,15 @@ body.touch #carbtn { display: block; } body.touch.driving #brakebtn { display: b
 .list { display: grid; gap: 6px; font-size: 13.5px; } .list div { display: flex; justify-content: space-between; gap: 10px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; } .list .done { color: var(--dim); } .list .now { border-color: var(--gold); }
 @media (max-width: 640px) { #objbox { top: auto; bottom: calc(196px + env(safe-area-inset-bottom, 0px)); } }
 @media (prefers-reduced-motion: reduce) { #zone.pop, #flash.go { animation: none; } #toast, #fade { transition: none; } }
+#quality { position: fixed; right: max(20px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); z-index: 5; background: #100b10db; color: var(--gold); border: 1px solid var(--line); border-radius: 5px; padding: 7px 10px; font: 600 10px var(--body); letter-spacing: .12em; cursor: pointer; }
+#shutter { bottom: calc(58px + env(safe-area-inset-bottom)); }
+#demo-guide { position: fixed; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(540px, 60vw); text-align: center; color: var(--bone); background: #09060ade; border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; font-size: 12px; pointer-events: none; }
+.demo-tag { color: var(--gold); font-family: var(--display); }
+.demo-facts { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; }
+.demo-facts span { border: 1px solid var(--line); padding: 8px; font-size: 10px; letter-spacing: .1em; color: var(--gold); }
+#panel .card { box-shadow: 0 30px 100px #0009; }
+#loading { z-index: 10; text-align: center; padding: 24px; letter-spacing: .1em; }
+@media (max-width: 640px) { #demo-guide { bottom: calc(274px + env(safe-area-inset-bottom)); width: calc(100% - 60px); } .card h2 { font-size: 26px; } #dialog { bottom: calc(130px + env(safe-area-inset-bottom)); } }
 </style>
 <script type="importmap">
 { "imports": {
@@ -108,7 +117,17 @@ body.touch #carbtn { display: block; } body.touch.driving #brakebtn { display: b
 <button id="shutter" aria-label="Take a photo">SHOOT</button>
 <div id="toast" class="hud" role="status"></div>
 <div id="flash"></div><div id="fade"></div>
+<button id="quality" aria-label="Cycle graphics quality">BALANCED</button>
+<div id="demo-guide" hidden role="status"></div>
 <div id="loading">MVP MEDIA · LAS VEGAS — THE UNDERGROUND CUT</div>
-<script type="module" src="./main.js"></script>
+<script type="module">
+import('./main.js').catch(error => {
+  console.error(error);
+  const loading = document.getElementById('loading');
+  loading.hidden = false;
+  loading.replaceChildren(document.createTextNode('Unable to start the 3D demo. Check your connection and WebGL support. '));
+  const retry = document.createElement('button'); retry.textContent = 'Retry'; retry.onclick = () => location.reload(); loading.append(retry);
+});
+</script>
 </body>
 </html>
