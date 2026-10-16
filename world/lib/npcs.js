@@ -18,7 +18,10 @@ function carGeos() {
   const w = new THREE.Shape(); w.moveTo(-1.12, 1.07); w.lineTo(-0.68, 1.39); w.lineTo(0.47, 1.39); w.lineTo(1.04, 1.05); w.lineTo(-1.12, 1.07);
   glassGeo = new THREE.ExtrudeGeometry(w, { depth: 1.82, bevelEnabled: false }); glassGeo.translate(0, 0.005, -0.91);
 }
-export function carModel(color, mine) {
+const flareMat = {};
+const flare = (c, k) => flareMat[c + k] || (flareMat[c + k] = new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(c).multiplyScalar(k), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+let taxiSign = null;
+export function carModel(color, mine, opts = {}) {
   carGeos();
   const g = new THREE.Group(), glass = mat('#0a1018', 0.05, 0.9), tire = mat('#0e0e10', 0.85), rim = mat('#c8c8d0', 0.25, 1);
   const body = new THREE.Mesh(bodyGeo, paint(color)); body.castShadow = true; g.add(body, new THREE.Mesh(glassGeo, glass));
@@ -31,6 +34,16 @@ export function carModel(color, mine) {
   const beam = Rt(M(new THREE.PlaneGeometry(10, 6), new THREE.MeshBasicMaterial({ map: glowTex, color: new THREE.Color(0.9, 0.85, 0.7), transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false })), -Math.PI / 2, 0, 0);
   beam.position.set(6.5, 0.05, 0); beam.scale.set(1, 0.6, 1); g.add(beam);
   if (mine) g.add(M(new THREE.BoxGeometry(0.02, 0.1, 0.32), neon('#ff2a3a', 3), -2.33, 0.55, 0));
+  // lamp flares: soft halos that bloom and show in the wet-road reflection
+  for (const z of [0.58, -0.58]) {
+    const h = new THREE.Sprite(flare('#fff1d6', 2.2)); h.position.set(2.5, 0.74, z); h.scale.setScalar(0.9); g.add(h);
+    const t = new THREE.Sprite(flare('#ff2020', 1.6)); t.position.set(-2.45, 0.8, z); t.scale.setScalar(0.7); g.add(t);
+  }
+  if (opts.taxi) { // roof sign + checker stripe
+    taxiSign = taxiSign || new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff2b0, emissiveIntensity: 0.9, roughness: 0.4 });
+    g.add(M(new THREE.BoxGeometry(0.5, 0.22, 1.0), taxiSign, -0.1, 1.56, 0));
+    for (const z of [0.93, -0.93]) g.add(M(new THREE.BoxGeometry(2.6, 0.08, 0.02), mat('#141414', 0.5), 0, 0.72, z));
+  }
   g.userData.wheels = wheels;
   return g;
 }
@@ -44,7 +57,7 @@ export class Traffic {
     for (const L of lanes) { const n = L.axis === 'z' ? 11 : 6; for (let i = 0; i < n; i++) this.spawn(L, -L.span + (i + Math.random() * 0.5) * (2 * L.span / n)); }
   }
   spawn(L, s) {
-    const m = carModel(pick(COLORS)); this.scene.add(m);
+    const taxi = Math.random() < 0.28, m = carModel(taxi ? '#f2b705' : pick(COLORS), false, { taxi }); this.scene.add(m);
     this.cars.push({ L, s, v: rand(9, 13), max: rand(11, 15), m });
   }
   // light state per axis: 'g' | 'y' | 'r'

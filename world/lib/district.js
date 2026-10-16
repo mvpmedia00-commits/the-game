@@ -3,25 +3,14 @@
 import * as THREE from 'three';
 import { applySurface } from './materials.js';
 import { buildVelvetExterior } from './venue.js';
+import { facadeMaterial, RoofKit } from './architecture.js';
+import { lightShafts } from './sky.js';
 import { mat, neon, signMesh, canvasTex, glowTex, M, Sc, Rt, boxG, cylG, sphG, planeG, makeDSLR } from '../../hd-demo/lib/characters.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 let seed = 7; const srand = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
 
 // ---------- textures
-function windowsTex(kind, emissive) {
-  const pal = { warm: ['#ffd9a0', '#ffb070', '#fff0d0'], cool: ['#a8d8ff', '#d8ecff', '#ffd9a0'], casino: ['#ffd27a', '#ffe8b0', '#ffb040'] }[kind] || ['#ffd9a0', '#a8d8ff', '#ffb070'];
-  const t = canvasTex(256, 256, (g) => {
-    g.fillStyle = emissive ? '#000' : kind === 'casino' ? '#2a2018' : '#1f1a22'; g.fillRect(0, 0, 256, 256);
-    for (let y = 0; y < 8; y++) for (let x = 0; x < 6; x++) {
-      const on = srand() < (kind === 'casino' ? 0.7 : 0.45), c = pal[Math.floor(srand() * pal.length)];
-      g.fillStyle = emissive ? (on ? c : '#000') : (on ? c : '#10141e');
-      g.fillRect(x * 42.6 + 6, y * 32 + 6, 31, 20);
-      if (!emissive) { g.fillStyle = 'rgba(255,255,255,.05)'; g.fillRect(x * 42.6 + 4, y * 32 + 28, 35, 2); }
-    }
-  });
-  t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
-}
 function asphaltMats() {
   const rough = canvasTex(512, 512, (g) => {
     g.fillStyle = 'rgb(160,160,160)'; g.fillRect(0, 0, 512, 512);
@@ -70,14 +59,25 @@ export function buildDistrict(scene) {
   for (const [x, z, w, d] of [[-5, -14, 9.5, 0.45], [5, 14, 9.5, 0.45], [-16, 4, 0.45, 7.5], [16, -4, 0.45, 7.5]]) W.add(M(boxG(w, 0.01, d), paint, x, 0.022, z)); // stop lines
 
   // ---------- building kit
-  const facades = { warm: [windowsTex('warm', false), windowsTex('warm', true)], cool: [windowsTex('cool', false), windowsTex('cool', true)], casino: [windowsTex('casino', false), windowsTex('casino', true)] };
-  const facadeMat = (kind, w, h) => { const [m, e] = facades[kind]; const a = m.clone(), b = e.clone(); a.needsUpdate = b.needsUpdate = true; a.repeat.set(w / 14, h / 14); b.repeat.copy(a.repeat); return new THREE.MeshStandardMaterial({ map: a, emissiveMap: b, emissive: 0xffffff, emissiveIntensity: 1.6, roughness: 0.55, metalness: 0.2 }); };
-  const roofM = mat('#18141a', 0.9);
+  const roofs = new RoofKit();
+  const roofM = mat('#2a262a', 0.95);
+  // One massing block with its own facade materials (x faces use depth, z faces use width for tiling).
+  function mass(x0, x1, z0, z1, ya, yb, kind) {
+    const w = x1 - x0, d = z1 - z0, h = yb - ya, fx = facadeMaterial(kind, d, h), fz = facadeMaterial(kind, w, h);
+    fx.map.offset.y = fz.map.offset.y = 0; // floors start at the block's base
+    for (const m of [fx, fz]) for (const k of ['emissiveMap', 'roughnessMap', 'normalMap']) m[k].offset.y = 0;
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [fx, fx, roofM, roofM, fz, fz]); b.position.set((x0 + x1) / 2, ya + h / 2, (z0 + z1) / 2); b.castShadow = b.receiveShadow = true; W.add(b);
+    return b;
+  }
   function building(x0, x1, z0, z1, h, kind = 'warm', trim = null, opts = {}) {
     const w = x1 - x0, d = z1 - z0, y0 = opts.y0 || 0;
-    const fx = facadeMat(kind, d, h - (opts.ground ? 5 : 0)), fz = facadeMat(kind, w, h - (opts.ground ? 5 : 0));
-    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [fx, fx, roofM, roofM, fz, fz]); b.position.set((x0 + x1) / 2, y0 + h / 2, (z0 + z1) / 2); b.castShadow = b.receiveShadow = true; W.add(b);
-    if (trim) for (const [x, z, ww, dd] of [[(x0 + x1) / 2, z0, w, 0.12], [(x0 + x1) / 2, z1, w, 0.12], [x0, (z0 + z1) / 2, 0.12, d], [x1, (z0 + z1) / 2, 0.12, d]]) W.add(M(boxG(ww + 0.12, 0.18, dd + 0.12), neon(trim, 4), x, y0 + h + 0.05, z));
+    // Tall blocks step back like real towers: a podium-height base, then an inset tower.
+    const tier = h > 40 && !opts.noTier && w > 16 && d > 16, hb = tier ? Math.round(h * 0.62 / 3.5) * 3.5 : h, ins = tier ? Math.min(w, d) * 0.13 : 0;
+    const b = mass(x0, x1, z0, z1, y0, y0 + hb, kind);
+    if (tier) { mass(x0 + ins, x1 - ins, z0 + ins, z1 - ins, y0 + hb, y0 + h, kind); roofs.parapet(x0, x1, z0, z1, y0 + hb); roofs.clutter(x0, x0 + ins * 2, z0, z1, y0 + hb, false); }
+    const tx0 = x0 + ins, tx1 = x1 - ins, tz0 = z0 + ins, tz1 = z1 - ins;
+    if (!opts.noRoof) { roofs.parapet(tx0, tx1, tz0, tz1, y0 + h); roofs.clutter(tx0, tx1, tz0, tz1, y0 + h + 0.0, h > 40); }
+    if (trim) for (const [x, z, ww, dd] of [[(tx0 + tx1) / 2, tz0, tx1 - tx0, 0.12], [(tx0 + tx1) / 2, tz1, tx1 - tx0, 0.12], [tx0, (tz0 + tz1) / 2, 0.12, tz1 - tz0], [tx1, (tz0 + tz1) / 2, 0.12, tz1 - tz0]]) W.add(M(boxG(ww + 0.12, 0.18, dd + 0.12), neon(trim, 4), x, y0 + h + (opts.noRoof ? 0.05 : 1.2), z));
     // Floor reveals and a stone plinth add architectural depth to the flat facade.
     facadeBands.push([(x0+x1)/2,y0+.42,z0,w,.7,.1],[(x0+x1)/2,y0+.42,z1,w,.7,.1]);
     for(let floor=5;floor<h;floor+=4.5){
@@ -108,7 +108,7 @@ export function buildDistrict(scene) {
 
   // ---------- NW: Crown Casino (podium + tower + forecourt fountain)
   building(-95, -36, -110, -18, 16, 'casino', '#ffcc33');
-  const tower = building(-82, -52, -96, -62, 104, 'casino', '#ffcc33', { y0: 0, noCollide: true });
+  const tower = building(-82, -52, -96, -62, 104, 'casino', '#ffcc33', { y0: 0, noCollide: true, noTier: true, noRoof: true });
   for (let i = 0; i < 6; i++) W.add(M(boxG(0.3, 100, 0.3), neon('#ffcc33', 3), -82 + i * 6, 52, -61.9));
   const crown = new THREE.Group(); crown.position.set(-67, 104, -79); W.add(crown);
   crown.add(Rt(M(new THREE.TorusGeometry(11, 0.8, 10, 40), mat('#e8b64c', 0.2, 1)), Math.PI / 2, 0, 0));
@@ -203,6 +203,7 @@ export function buildDistrict(scene) {
   const glowM = new THREE.MeshBasicMaterial({ map: glowTex, color: new THREE.Color(1.0, 0.62, 0.32), transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false });
   const gg = new THREE.PlaneGeometry(12, 12); gg.rotateX(-Math.PI / 2);
   inst(gg, glowM, lightPts, (o, [x, z, ax, az]) => o.position.set(x + ax, 0.19, z + az));
+  const shafts = lightShafts(lightPts.map(([x, z, ax, az]) => [x + ax, 7.75, z + az])); W.add(shafts);
   for (const [x, z] of lightPts) circles.push({ x, z, r: 0.25 });
   const trunk = mat('#5a4636', 0.95), leaf = mat('#1f5a2c', 0.8, 0, { side: THREE.DoubleSide });
   const frond = new THREE.PlaneGeometry(0.6, 3.2, 1, 6); frond.translate(0, 1.6, 0);
@@ -227,7 +228,7 @@ export function buildDistrict(scene) {
   for (const [x, z, ry] of [[13.8, -8 - 14, -Math.PI / 2], [-13.8, 40, Math.PI / 2]]) { const b = new THREE.Group(); b.position.set(x, 0.16, z); b.rotation.y = ry; b.add(M(boxG(2, 0.08, 0.5), mat('#3a2a20', 0.8), 0, 0.45, 0), M(boxG(2, 0.5, 0.08), mat('#3a2a20', 0.8), 0, 0.75, -0.25)); for (const sx of [-0.9, 0.9]) b.add(M(boxG(0.06, 0.45, 0.45), pole, sx, 0.22, 0)); W.add(b); box(x - 0.6, x + 0.6, z - 1.1, z + 1.1); }
 
   // ---------- distant skyline + mountains (not walkable)
-  const skyFacade = facadeMat('cool', 14, 14); skyFacade.emissiveIntensity = 1.2;
+  const skyFacade = facadeMaterial('cool', 28, 84, { glow: 1.1 });
   const towers = []; for (let i = 0; i < 140 && towers.length < 80; i++) { const a = srand() * Math.PI * 2, r = 180 + srand() * 260, w = 14 + srand() * 22, x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.abs(x) < 75 || Math.abs(z) < 75) continue; towers.push([x, z, w, 30 + srand() * 140]); }
   const tg = new THREE.BoxGeometry(1, 1, 1); tg.translate(0, 0.5, 0);
   const ti = new THREE.InstancedMesh(tg, skyFacade, towers.length); towers.forEach(([x, z, w, h], i) => { o.position.set(x, 0, z); o.rotation.set(0, srand(), 0); o.scale.set(w, h, w); o.updateMatrix(); ti.setMatrixAt(i, o.matrix); }); W.add(ti);
@@ -272,6 +273,7 @@ export function buildDistrict(scene) {
   const bands = new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),mat('#27252e',.6,.25),facadeBands.length);
   facadeBands.forEach(([x,y,z,w,h,d],i)=>{o.position.set(x,y,z);o.rotation.set(0,0,0);o.scale.set(w,h,d);o.updateMatrix();bands.setMatrixAt(i,o.matrix);});
   bands.receiveShadow=true;W.add(bands);
+  roofs.build(W);
   // ---------- where people stand (story contacts) and the edge of the map
   const NPC = {
     ruby: { x: 12.3, z: -24.5, ry: -Math.PI / 2 }, bouncer: { x: 13.6, z: velvetDoor.z + 0.8, ry: -Math.PI / 2 }, tony: { x: 12.4, z: velvetDoor.z - 2.2, ry: -Math.PI / 2 },
@@ -288,8 +290,8 @@ export function buildDistrict(scene) {
   const update = (t, player) => {
     velvetExterior.update(t, player);
     jets.forEach((j, i) => { j.scale.y = 0.85 + Math.sin(t * 3 + i) * 0.15; });
-    crown.rotation.y = t * 0.05;
+    crown.rotation.y = t * 0.05; roofs.update(t);
     const on = Math.sin(t * 6) > 0; for (const b of blinkers) b.material.color.setRGB(on ? 3 : 0.2, on ? 1.8 : 0.1, 0);
   };
-  return { colliders, circles, pois, zones, bounds, inBounds, NPC, spawn, parked, myCarSpot, walks, signals, update, premiere, doors: { velvet: velvetDoor, lens: lensDoor, studio: studioDoor } };
+  return { groundMats: { asphalt, walk }, shafts, colliders, circles, pois, zones, bounds, inBounds, NPC, spawn, parked, myCarSpot, walks, signals, update, premiere, doors: { velvet: velvetDoor, lens: lensDoor, studio: studioDoor } };
 }

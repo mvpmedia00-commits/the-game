@@ -6,6 +6,9 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { buildVisuals, CinemaGrade } from './lib/visuals.js';
+import { makeNightSky } from './lib/sky.js';
+import { WetReflections } from './lib/reflect.js';
+import { buildStrip } from './lib/strip.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import * as C from '../hd-demo/lib/characters.js';
@@ -63,8 +66,7 @@ const sfx = n => { try { SFX[n](); } catch (e) {} };
 
 // ---------- world
 const world = new THREE.Scene();
-const skyTex = C.canvasTex(8, 512, (g) => { const r = g.createLinearGradient(0, 0, 0, 512); r.addColorStop(0, '#05030c'); r.addColorStop(0.55, '#120a24'); r.addColorStop(0.8, '#3a1428'); r.addColorStop(1, '#6a2a2a'); g.fillStyle = r; g.fillRect(0, 0, 8, 512); });
-world.add(new THREE.Mesh(new THREE.SphereGeometry(1200, 32, 16), new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false })));
+const sky = makeNightSky(1200); sky.userData.update(0); world.add(sky);
 { const g = new THREE.BufferGeometry(), p = []; for (let i = 0; i < 1500; i++) { const a = Math.random() * Math.PI * 2, e = Math.random() * 1.3 + 0.12; p.push(Math.cos(a) * Math.cos(e) * 1100, Math.sin(e) * 1100, Math.sin(a) * Math.cos(e) * 1100); } g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); world.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 1.4, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.7 }))); }
 world.fog = new THREE.Fog(0x141521, 95, 510);
 { const pm = new THREE.PMREMGenerator(renderer), env = new THREE.Scene(); env.background = new THREE.Color(0x06030a);
@@ -76,11 +78,15 @@ const moon = new THREE.DirectionalLight(0xb8c4ff, 0.7); moon.castShadow = true; 
 Object.assign(moon.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 200 }); moon.shadow.bias = -0.0005; moon.shadow.normalBias = 0.03; world.add(moon, moon.target);
 const D = buildDistrict(world);
 const visuals = buildVisuals(world, D);
+const strip = buildStrip(world, D);
 const traffic = new Traffic(world, D.signals);
 const peds = new Pedestrians(world, D.walks, TOUCH ? 18 : 30);
 for (const p of D.parked) { const c = carModel(p.color); c.position.set(p.x, 0, p.z); c.rotation.y = p.ry + Math.PI / 2; world.add(c); }
 const carMesh = carModel('#c8141f', true); world.add(carMesh);
 const car = new PlayerCar(carMesh, D.myCarSpot.x, D.myCarSpot.z, D.myCarSpot.a);
+const wet = new WetReflections(); // rain-slick streets mirror the neon
+wet.apply(D.groundMats.asphalt, 0.32, 0.68); wet.apply(D.groundMats.walk, 0.12, 0.3); wet.apply(visuals.puddles.material, 0.95, 0);
+wet.collectGround(world);
 
 // ---------- interiors
 const studio = new THREE.Scene(); buildStudio(studio, true);
@@ -120,6 +126,11 @@ function npc(id, look) { const rig = C.makeHero(look); springs.addRig(rig); NPCS
 npc('ruby', Object.assign({ outfit: 'two' }, C.TALENT.ruby.look)); npc('nova', Object.assign({ outfit: 'gown' }, C.TALENT.nova.look)); npc('jade', Object.assign({ outfit: 'jump' }, C.TALENT.jade.look));
 npc('coco', Object.assign({ outfit: 'dress' }, C.TALENT.coco.look));
 for (const k of ['tony', 'editor', 'dee', 'landlord', 'bouncer']) npc(k, NPC_LOOKS[k]);
+// Layer 1 = drawn normally and casts shadows, but skipped by the wet-street reflection pass (keeps it cheap).
+const noReflect = o => o.traverse(c => c.layers.set(1));
+camera.layers.enable(1); moon.shadow.camera.layers.enable(1);
+for (const n of Object.values(NPCS)) noReflect(n.rig.root);
+for (const p of peds.peds) noReflect(p.root);
 let freeModel = null; // freelance model for gigs
 const P = { x: save.x ?? D.spawn.x, z: save.z ?? D.spawn.z, a: D.spawn.yaw, ry: D.spawn.yaw, walk: 0, move: 0 };
 if (!D.inBounds(P.x, P.z)) { P.x = D.spawn.x; P.z = D.spawn.z; }
@@ -513,6 +524,7 @@ function drawMap(target) {
 const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 60, 20, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.5, 0.25, 0.3), transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
 beacon.geometry.translate(0, 30, 0); world.add(beacon);
 const v3 = new THREE.Vector3(), lookAt = new THREE.Vector3(); let snapCam = true, shake = 0, T = 0;
+let debugCam = null;
 function update(dt) {
   if (DEMO && !demoStarted) return;
   if (DEMO && !panel.hidden) { if ((pressed.has('Escape') || pressed.has('Tab')) && panel.dataset.dismissible === 'true') closePanel(); return; }
@@ -543,7 +555,7 @@ function update(dt) {
   if (!blocked) updMission(dt);
   if (where === 'world') {
     traffic.update(dt, driving ? { x: 999, z: 999 } : P, [car, ...(chaser ? [chaser] : [])]); peds.update(dt, P, driving ? car : null); D.update(T, P);
-    moon.position.set(P.x - 30, 60, P.z + 20); moon.target.position.set(P.x, 0, P.z);
+    moon.position.set(P.x - 30, 35, P.z - 40); sky.userData.update(T, camera.position); strip.update(T); moon.target.position.set(P.x, 0, P.z);
     D.premiere.visible = (act && act.m.id === 'finale') || save.story >= 7;
     const z = D.zones.find(z => P.x > z.minX && P.x < z.maxX && P.z > z.minZ && P.z < z.maxZ); setZone(z ? z.name : 'The Strip');
   } else { if (where === 'club') CLUB.update(T); setZone(SC[where].zone); }
@@ -570,7 +582,9 @@ function update(dt) {
   }
   if (shake > 0 && !reducedMotion) { camera.position.x += rand(-1, 1) * shake * 0.3; camera.position.y += rand(-1, 1) * shake * 0.2; shake = Math.max(0, shake - dt * 2); }
   visuals.update(T, P, cam.yaw, where === 'world', reducedMotion);
-  camera.lookAt(lookAt); camera.updateProjectionMatrix();
+  camera.lookAt(lookAt);
+  if (debugCam) { camera.position.set(...debugCam.pos); camera.fov = debugCam.fov || 58; camera.lookAt(...debugCam.look); } // screenshot tooling
+  camera.updateProjectionMatrix();
   renderer.toneMappingExposure = SC[where].exposure;
   $('#demo-guide').hidden = !DEMO || !!dialog;
   if (DEMO) {
@@ -595,7 +609,7 @@ function applyQuality(value) {
   bloom.enabled = !low; bloom.strength = high ? 0.55 : 0.4;
   bloom.threshold = 1.15; bloom.radius = 0.6;
   gradePass.enabled = !low; gradePass.uniforms.amount.value = high ? .9 : .6;
-  visuals.mode = value; visuals.setQuality(value);
+  visuals.mode = value; visuals.setQuality(value); wet.setQuality(value, TOUCH);
   try { localStorage.setItem('mvp_graphics_quality', value); } catch (_) {}
   resize();
   $('#quality').textContent = value.toUpperCase();
@@ -640,10 +654,10 @@ canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); contextLo
 function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); composer.setSize(w, h); bloom.resolution.set(w / 2, h / 2); edgePass.uniforms.resolution.value.set(1 / (w * renderer.getPixelRatio()), 1 / (h * renderer.getPixelRatio())); camera.aspect = w / h; gradePass.uniforms.aspect.value = w / h; camera.updateProjectionMatrix(); const ms = Math.round(Math.min(170, w * 0.28) * Math.min(devicePixelRatio, 2)); map.width = map.height = ms; }
 addEventListener('resize', resize); resize();
 const clock = new THREE.Clock();
-function frame() { requestAnimationFrame(frame); const dt = Math.min(clock.getDelta(), 0.05); if (document.hidden || contextLost) return; update(dt); pressed.clear(); composer.render(); }
+function frame() { requestAnimationFrame(frame); const dt = Math.min(clock.getDelta(), 0.05); if (document.hidden || contextLost) return; update(dt); pressed.clear(); if (where === 'world') wet.render(renderer, world, camera); composer.render(); }
 let preferredQuality = 'balanced';
 try { const stored = localStorage.getItem('mvp_graphics_quality'); if (['performance', 'balanced', 'cinematic'].includes(stored)) preferredQuality = stored; } catch (_) {}
 applyQuality(preferredQuality);
 refreshHud(); $('#loading').hidden = true; if (DEMO) { demoStarted = true; update(0); demoTitle(); } frame();
 addEventListener('beforeunload', persist);
-window.__world = { P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update };
+window.__world = { set debugCam(v) { debugCam = v; }, probe() { const r = renderer, out = {}; r.info.autoReset = false; const count = (k, f) => { r.info.reset(); f(); out[k] = r.info.render.calls; }; count('main', () => r.render(world, camera)); count('reflect', () => wet.render(renderer, world, camera)); const by = {}; world.traverse(o => { if (o.isMesh || o.isSprite || o.isPoints) { let p = o; while (p.parent && p.parent !== world) p = p.parent; const k = (p.name || p.type) + ':' + (o.isSprite ? 'sprite' : o.isInstancedMesh ? 'inst' : 'mesh'); by[k] = (by[k] || 0) + (Array.isArray(o.material) ? o.material.length : 1); } }); out.by = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 14); r.info.autoReset = true; return out; }, renderFrame() { if (where === 'world') wet.render(renderer, world, camera); composer.render(); }, P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update };

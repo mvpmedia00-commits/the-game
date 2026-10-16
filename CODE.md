@@ -32,6 +32,13 @@ the-game/
 │       ├── npcs.js         Car models, traffic AI with traffic lights, pedestrians (123 lines)
 │       ├── car.js          Your car's driving physics + the getaway-car AI for chases (87 lines)
 │       ├── club.js         The Velvet Room interior (67 lines)
+│       ├── venue.js        The Velvet Room's Art Deco street entrance
+│       ├── architecture.js Realistic building skins (PBR facades) + rooftop gear
+│       ├── sky.js          Night sky shader (city glow, clouds, moon) + streetlight haze cones
+│       ├── reflect.js      Wet-street planar reflections
+│       ├── strip.js        LED video boards, bulb marquees, Crown pylon, skybridge, street clutter
+│       ├── visuals.js      Puddles, drains, steam, character fill light, color grade
+│       ├── materials.js    Loads the CC0 asphalt/concrete photo textures
 │       └── story.js        All story data: missions, dialogue, rungs, gear, sets, talent attitudes (85 lines)
 ├── hd-demo/                Character showroom (also supplies shared code to world/)
 │   ├── index.html, main.js Showroom UI: sets, physics slider, photo mode, .glb drag-and-drop
@@ -320,10 +327,33 @@ The world game still uses the code-built characters; swapping the real models in
 
 ---
 
+## 12b. How the city is made to look real
+
+| Effect | File | How it works |
+|---|---|---|
+| **Building facades** | `architecture.js` → `facadeMaterial()` | One full PBR texture set per style (glass office, gold casino glass, stucco hotel, brick), each covering 8 bays × 8 floors at real 3.5 m spacing: color, glowing windows (rooms with ceiling lights, curtains, blinds, silhouettes), roughness (glass is mirror-smooth, walls are rough) and a normal map for frames and sills. Every building gets its own offset and light tint so no two look alike. |
+| **Street light on walls** | `architecture.js` → `addStreetWash()` | A shader tweak adds warm light spilling up from the street, fading with height, plus a faint sky glow on upper floors. |
+| **Tower shapes and roofs** | `district.js` → `building()` + `RoofKit` | Buildings over 40 m step back above a podium. Every roof gets a parapet, stair/elevator rooms, HVAC units, water tanks, antennas and blinking red aircraft lights (all instanced, a few draw calls total). |
+| **Night sky** | `sky.js` → `makeNightSky()` | A shader dome: navy zenith, orange/magenta light pollution at the horizon, slowly drifting clouds lit from below by the city, and a moon with a halo lined up with the shadow light. |
+| **Wet streets** | `reflect.js` → `WetReflections` | Each frame the city is drawn again from a camera mirrored under the road (at 1/2 or 1/3 resolution). Road, sidewalk and puddle materials sample that image, smeared vertically like real wet asphalt, stronger at grazing angles and where a world-space puddle mask says there's standing water. Characters and pedestrians are on layer 1, which the reflection pass skips to save time. |
+| **Vegas signage** | `strip.js` | Four animated LED screens (MVP Media, Crown jackpot reels, Scarlet Lounge, Vegas Nightlife Weekly) drawn to canvases at 12 fps with an LED pixel grid; chasing-bulb marquees; the Crown pylon sign; a glass skybridge over the boulevard; parking meters, trash cans, news boxes and a bus shelter; median shrubs and uplit palms. |
+| **Cars** | `npcs.js` → `carModel()` | Headlight and taillight flares (they bloom and show up in the wet road) and taxis with roof signs (about 28% of traffic). |
+
+**Graphics presets** (the button in the corner):
+- **Performance** turns off shadows, bloom, color grading and reflections.
+- **Balanced** adds them back, with reflections at 1/3 resolution on desktop. On phones, Balanced skips reflections.
+- **Cinematic** draws reflections at 1/2 resolution, at a higher pixel ratio.
+
+**Cost** (desktop, Cinematic, at the studio): about 1,130 draw calls for the main view plus about 540 for the reflection pass.
+
+---
+
 ## 13. Testing and debugging
 
 - `window.__world` in the browser console exposes the game state: `__world.save` (edit cash, story, etc.), `__world.startMission(__world.STORY[3], 'story')`, `__world.enter('club')`, `__world.update(0.033)` to step one frame.
 - Automated checks have been run in headless Chromium (Playwright): mission 1 end to end, driving, a full chase, buying the studio, producing a film, the rung HUD and the Catalog.
+- `__world.debugCam = { pos: [x, y, z], look: [x, y, z] }` freezes the camera for screenshots (`null` to release). `__world.probe()` reports draw calls for the main and reflection passes.
+- `node tests/demo-flow.cjs` checks the demo mission flow. `tools/check-graphics.cjs` builds the whole city, strip, reflections and sky in Node to catch broken geometry (see GRAPHICS.md for how to run it).
 - **Reset your save:** in the console, `localStorage.removeItem('mvp_world_v2')` and reload.
 
 ---
@@ -341,4 +371,7 @@ The world game still uses the code-built characters; swapping the real models in
 | Tune driving | `world/lib/car.js` → `PlayerCar.update()` |
 | Tune hair and body physics | `hd-demo/lib/springs.js` → `PRESETS` |
 | Change the look (glow, exposure) | `main.js` → bloom settings and `SC[...].exposure` |
+| Change building looks or window light | `world/lib/architecture.js` (`makeSet`, `TINTS`, `WASH`) |
+| Make streets wetter or drier | `main.js` → `wet.apply(material, base, puddles)` |
+| Add an LED screen or marquee | `world/lib/strip.js` → `new LedBoard(...)`, `new Marquee(...)`, `PROGRAMS` |
 | Change HUD layout or colors | `world/index.html` (CSS at the top) |
