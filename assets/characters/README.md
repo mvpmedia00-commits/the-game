@@ -1,0 +1,32 @@
+# Characters
+
+Put finished characters here. The HD demo loads these automatically:
+
+| File | Slot |
+|---|---|
+| `mvp.glb` | MVP |
+| `ruby.glb` | Ruby |
+
+## Sending a new character
+
+1. Build the character in **Character Creator 4** (or Meshy / Tripo / Rodin for a quick test). Keep the full skeleton, including breast, hair and skirt bones.
+2. Export:
+   - Character Creator 4: **FBX**, Unity or Blender preset, textures embedded.
+   - Meshy / Tripo / Rodin: **GLB**.
+3. Upload the raw file to `uploads/` in this repo (github.com → Add file → Upload files). The website accepts files up to 25 MB; use GitHub Desktop for files up to 100 MB.
+4. Tell Claude "uploaded". It converts and compresses the file with `tools/optimize-character.sh` and saves the result here.
+
+Optional: animation clips (idle, walk, dance, poses) exported the same way, named like `ruby_dance.fbx`.
+
+## How the physics finds bones
+
+Bones whose names contain these words get spring physics automatically:
+
+| Word in bone name | Motion |
+|---|---|
+| breast, bust | chest |
+| hair, braid, ponytail, bang | hair |
+| skirt, dress, tutu, cloth | skirt and cloth |
+| earring, hoop | earrings |
+
+Character Creator 4 names its chest bones `CC_Base_L_Breast` / `CC_Base_R_Breast`, so they are picked up with no extra setup.

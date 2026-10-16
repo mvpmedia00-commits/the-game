@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MVP Media Games</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;900&family=Montserrat:wght@400;600&display=swap">
+<style>
+:root { --ink: #09060a; --bone: #f3e9e4; --dim: #b8a3a0; --red: #e0202e; color-scheme: dark; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(ellipse at 50% 0%, #2a0a10, var(--ink) 70%); color: var(--bone); font-family: Montserrat, system-ui, sans-serif;
+  display: grid; place-items: center; padding: 32px max(16px, env(safe-area-inset-right, 0px)) 32px max(16px, env(safe-area-inset-left, 0px)); box-sizing: border-box; }
+main { width: min(720px, 100%); display: grid; gap: 28px; text-align: center; }
+h1 { margin: 0; font-family: Cinzel, Georgia, serif; font-weight: 900; font-size: clamp(56px, 14vw, 110px); line-height: .9; background: linear-gradient(180deg, #ff6a70, #e0202e 45%, #9a0a14); -webkit-background-clip: text; background-clip: text; color: transparent; }
+h1 span { display: block; font-size: .45em; font-weight: 600; letter-spacing: .06em; background: linear-gradient(180deg, #fff, #9a9aa2); -webkit-background-clip: text; background-clip: text; }
+.tag { letter-spacing: .32em; font-size: 13px; color: var(--dim); text-transform: uppercase; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; text-align: left; }
+a.card { display: grid; gap: 6px; padding: 20px; border-radius: 14px; border: 1px solid rgba(243,233,228,.14); background: rgba(255,255,255,.04); color: inherit; text-decoration: none; }
+a.card:hover, a.card:focus-visible { border-color: var(--red); background: rgba(224,32,46,.1); outline: none; }
+a.card b { font-family: Cinzel, Georgia, serif; font-size: 20px; } a.card span { color: var(--dim); font-size: 14px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<main>
+  <h1>MVP<span>MEDIA</span></h1>
+  <div class="tag">Own the frame.</div>
+  <div class="cards">
+    <a class="card" href="hd-demo/"><b>HD Character Demo</b><span>MVP and Ruby on the studio and pool sets, bloom lighting, spring-bone physics, photo mode. Drop in your own .glb characters.</span></a>
+    <a class="card" href="beyond-the-frame/"><b>Beyond the Frame</b><span>The open-world prototype: drive Vegas after hours, run photo shoots, build MVP Studios. Desktop and iPhone.</span></a>
+  </div>
+</main>
+</body>
+</html>

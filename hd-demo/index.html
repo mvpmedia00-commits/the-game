@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MVP Media HD Demo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;900&family=Montserrat:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: full-bleed WebGL viewport; glass control panel docked right (bottom sheet on phones); shutter + photo strip bottom-left. Single dark studio look by design. */
+:root {
+  --ink: #09060a; --glass: rgba(14,8,11,.72); --line: rgba(243,233,228,.14);
+  --red: #e0202e; --red-hot: #ff3b48; --gold: #e8b64c; --bone: #f3e9e4; --dim: #b8a3a0;
+  --display: "Cinzel", Georgia, serif; --body: "Montserrat", system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; margin: 0; background: var(--ink); color: var(--bone); font-family: var(--body); overflow: hidden; }
+[hidden] { display: none !important; }
+#view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.brand { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(14px + env(safe-area-inset-top, 0px)); pointer-events: none; line-height: 1; }
+.brand b { font-family: var(--display); font-weight: 900; font-size: 30px; background: linear-gradient(180deg, #ff6a70, #e0202e 45%, #9a0a14); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.brand span { font-family: var(--display); font-weight: 600; font-size: 18px; letter-spacing: .06em; margin-left: 6px; }
+.brand small { display: block; margin-top: 6px; font-size: 10.5px; letter-spacing: .26em; text-transform: uppercase; color: var(--dim); }
+#panel { position: fixed; right: max(12px, env(safe-area-inset-right, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  width: 320px; overflow-y: auto; background: var(--glass); border: 1px solid var(--line); border-radius: 14px; -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  padding: 16px; display: grid; align-content: start; gap: 16px; transition: transform .3s ease; }
+body.panel-closed #panel { transform: translateX(calc(100% + 24px)); }
+#panelToggle { position: fixed; right: max(12px, env(safe-area-inset-right, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); z-index: 3; display: none; }
+section { display: grid; gap: 8px; }
+h2 { margin: 0; font-size: 10.5px; font-weight: 700; letter-spacing: .24em; text-transform: uppercase; color: var(--dim); }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; background: rgba(255,255,255,.05); border-radius: 9px; padding: 3px; }
+button, .filebtn { font: 600 13px/1.2 var(--body); color: var(--bone); background: transparent; border: 1px solid transparent; border-radius: 7px; padding: 8px 6px; cursor: pointer; }
+button:hover, .filebtn:hover { background: rgba(255,255,255,.07); }
+button:focus-visible, .filebtn:focus-within, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+button.on { background: var(--red); color: #fff; }
+.btn { border: 1px solid var(--line); background: rgba(255,255,255,.04); padding: 9px 12px; text-align: center; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row > * { flex: 1 1 auto; }
+input[type=range] { width: 100%; accent-color: var(--red-hot); }
+.phys { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+#physOut { font-weight: 700; color: var(--gold); min-width: 4.5em; text-align: right; font-variant-numeric: tabular-nums; }
+.info { display: grid; gap: 3px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 9px; font-size: 12.5px; }
+.info b { font-family: var(--display); font-size: 15px; } .info span { color: var(--dim); font-size: 12px; } .info small { color: var(--dim); }
+.clip select { margin-left: 6px; background: #1a1014; color: var(--bone); border: 1px solid var(--line); border-radius: 6px; padding: 3px; max-width: 160px; }
+.filebtn { display: block; text-align: center; border: 1px dashed rgba(255,59,72,.6); background: rgba(224,32,46,.08); padding: 12px; }
+.filebtn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.radio { display: flex; gap: 12px; font-size: 13px; } .radio label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.hint { margin: 0; font-size: 12px; line-height: 1.5; color: var(--dim); }
+.hint a { color: var(--gold); }
+label.check { display: flex; gap: 8px; align-items: center; font-size: 13px; cursor: pointer; }
+#shutter { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); width: 70px; height: 70px; border-radius: 50%; padding: 0;
+  background: rgba(243,233,228,.92); border: 5px solid rgba(255,255,255,.35); background-clip: padding-box; color: #120607; font-size: 10px; letter-spacing: .14em; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+#shutter:hover { background: #fff; background-clip: padding-box; }
+#strip { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 6px; max-width: calc(50% - 70px); overflow-x: auto; }
+#strip img { height: 56px; border-radius: 6px; border: 1px solid var(--line); display: block; }
+#flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+#flash.go { animation: fl .45s ease-out; } @keyframes fl { 0% { opacity: .9; } 100% { opacity: 0; } }
+#lightbox { position: fixed; inset: 0; background: rgba(5,2,4,.88); display: grid; place-items: center; gap: 12px; padding: 24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); z-index: 5; }
+#lightbox img { max-width: min(1100px, 100%); max-height: 78vh; border-radius: 10px; }
+#lightbox .row { justify-content: center; } #lightbox a { color: var(--bone); text-decoration: none; }
+#toast { position: fixed; left: 50%; top: calc(16px + env(safe-area-inset-top, 0px)); transform: translate(-50%, -20px); opacity: 0; transition: all .25s; background: var(--glass); border: 1px solid var(--line); border-radius: 9px; padding: 9px 14px; font-size: 13px; pointer-events: none; max-width: calc(100% - 32px); }
+#toast.on { opacity: 1; transform: translate(-50%, 0); }
+#loading { position: fixed; inset: 0; display: grid; place-items: center; background: var(--ink); font-family: var(--display); letter-spacing: .3em; color: var(--dim); }
+body.drag::after { content: "Drop your .glb character"; position: fixed; inset: 12px; border: 2px dashed var(--red-hot); border-radius: 16px; display: grid; place-items: center; font-family: var(--display); font-size: 24px; background: rgba(224,32,46,.12); pointer-events: none; }
+@media (max-width: 760px) {
+  #panel { top: auto; left: max(8px, env(safe-area-inset-left, 0px)); right: max(8px, env(safe-area-inset-right, 0px)); width: auto; max-height: 46vh; bottom: calc(104px + env(safe-area-inset-bottom, 0px)); }
+  body.panel-closed #panel { transform: translateY(calc(100% + 120px)); }
+  #panelToggle { display: block; background: var(--glass); border: 1px solid var(--line); }
+  #strip { max-width: calc(50% - 56px); }
+}
+@media (prefers-reduced-motion: reduce) { #panel, #toast { transition: none; } #flash.go { animation: none; } }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="view" aria-label="3D character viewer"></canvas>
+<div class="brand"><b>MVP</b><span>MEDIA</span><small>HD character demo</small></div>
+<button id="panelToggle" aria-label="Show or hide controls">Controls</button>
+<aside id="panel" aria-label="Demo controls">
+  <section><h2>Set</h2><div class="seg"><button data-set="studio" class="on">MVP Studios</button><button data-set="pool">Pool · Sunset</button></div></section>
+  <section><h2>Motion</h2>
+    <div class="seg"><button data-mode="pose" class="on">Poses</button><button data-mode="idle">Idle</button><button data-mode="walk">Walk</button><button data-mode="dance">Dance</button><button data-mode="hop">Hop</button></div>
+    <button id="bounce" class="btn">Bounce</button>
+  </section>
+  <section><h2>Physics</h2>
+    <div class="seg"><button data-phys="0">Off</button><button data-phys="0.25">Natural</button><button data-phys="1">Xtreme</button></div>
+    <div class="phys"><input id="phys" type="range" min="0" max="1" step="0.05" value="0.5" aria-label="Physics intensity"><output id="physOut" for="phys">Lively</output></div>
+    <p class="hint">Spring bones move hair, earrings, skirts and, on imported characters, chest bones. The stand-ins show it on hair, hoops and the tutu.</p>
+  </section>
+  <section><h2>Characters</h2>
+    <div class="info" id="info-mvp"></div><div class="info" id="info-ruby"></div>
+    <div class="radio" role="radiogroup" aria-label="Load into"><span class="hint">Load into:</span><label><input type="radio" name="slot" value="mvp"> MVP</label><label><input type="radio" name="slot" value="ruby" checked> Ruby</label></div>
+    <label class="filebtn">Choose a .glb file or drop it anywhere<input id="file" type="file" accept=".glb,.gltf"></label>
+    <div class="row"><button class="btn" data-reset="mvp">Reset MVP</button><button class="btn" data-reset="ruby">Reset Ruby</button></div>
+    <p class="hint">Files in <code>assets/characters/</code> named <code>mvp.glb</code> and <code>ruby.glb</code> load automatically.</p>
+  </section>
+  <section><h2>Camera</h2>
+    <div class="seg"><button data-view="full">Full</button><button data-view="mvp">MVP</button><button data-view="ruby">Ruby</button><button data-view="low">Low</button></div>
+    <label class="check"><input id="orbit" type="checkbox"> Auto orbit</label>
+    <p class="hint">Drag to orbit, scroll or pinch to zoom.</p>
+  </section>
+</aside>
+<div id="strip" aria-label="Photos taken"></div>
+<button id="shutter" aria-label="Take a photo">SHOOT</button>
+<div id="flash"></div>
+<div id="lightbox" hidden><img alt="Your photo"><div class="row"><a class="btn" download="mvp-media.jpg">Save photo</a><button class="btn" data-close>Close</button></div></div>
+<div id="toast" role="status"></div>
+<div id="loading">LOADING SET</div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
