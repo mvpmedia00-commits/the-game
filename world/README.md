@@ -14,19 +14,36 @@ Third-person HD district built on three r160 (no build step). Shares the charact
 
 ## Controls
 
-Desktop: WASD move, Shift run, mouse look (click to lock), E talk/enter, P photo.
-Touch: left thumb joystick (push fully to run), right thumb look, ACT, SHOOT.
+Desktop: WASD move/drive, Shift run, mouse look (click to lock), E talk/enter, F car, Space brake, P photo, Tab phone.
+Touch: left thumb joystick (push fully to run, or drive), right thumb look, ACT, CAR, BRAKE, SHOOT, PHONE.
 
-## Starter mission
+## Story (8 missions)
 
-1. Find Ruby outside The Velvet Room.
-2. Walk her to MVP Studios (she follows you).
-3. Take 3 promo photos of her on Stage A.
+| # | Mission | Giver | What you do |
+|---|---|---|---|
+| 1 | Velvet Hours | Phone (Tony Velvet) | Go into The Velvet Room, shoot Ruby's headliner set (4 photos) |
+| 2 | Proof Run | Tony, club door | Get the proofs to the editor at Crown Casino in 75 s (drive) |
+| 3 | Snatch & Grab | Editor, Crown Casino | Chase and ram the Neon Kings coupe |
+| 4 | Pool Party Cover | Dee, Lens & Light | Reach the Desert Rose pool in 120 s, shoot Nova (5 photos) |
+| 5 | Keys to the Kingdom | Landlord, Room 12 | Buy MVP Studios ($3,500) |
+| 6 | First Feature | Jade, outside the studio | Produce your first film on Stage A |
+| 7 | Bootleg Boulevard | Coco, Scarlet Lounge | Stop the bootleg van on Fremont |
+| 8 | Beyond the Frame | Ruby, outside the studio | Premiere red carpet (6 photos), then stop Silas Crane |
 
-Progress saves in the browser; Room 12 at the Desert Rose saves your position.
+Between missions: photo gigs (phone), Dee's gear shop (photo score, top speed), talent roster (sign Coco and Lex with rep), one studio production per day with daily royalties.
+Photos are scored on composition (face on a thirds point), how much of the frame she fills, and catching the pose; the average sets a quality bonus.
+
+## Driving
+
+Your red MVP car is parked outside MVP Studios. F (or CAR) gets in and out; W/S throttle and brake, A/D steer, Space handbrake. Las Vegas Blvd runs about 600 m and Fremont about 500 m, with traffic lights, traffic that queues and brakes, and road-closed barricades at the ends.
+
+Progress saves in the browser (phone > Save, or Room 12 at the Desert Rose).
 
 ## Code map
 
 - `lib/district.js`: geometry, colliders, points of interest, zones, walk paths, traffic signals
 - `lib/npcs.js`: traffic (signals, queueing, stops for the player) and pedestrians
-- `main.js`: player controller, camera, interiors, mission, dialog, minimap, photo mode, touch input
+- `lib/car.js`: player car physics and the getaway-driver AI
+- `lib/club.js`: The Velvet Room interior
+- `lib/story.js`: missions, gigs, gear, sets and production tuning
+- `main.js`: player and car control, cameras, interiors, NPC placement, mission runner, photo scoring, phone menus, production, saves

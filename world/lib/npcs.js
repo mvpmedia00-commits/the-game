@@ -40,8 +40,8 @@ const COLORS = ['#e8e2d8', '#1a1a22', '#6a7a8a', '#c8a040', '#2a4a7a', '#7a1a1a'
 export class Traffic {
   constructor(scene, signals) {
     this.scene = scene; this.signals = signals; this.cars = []; this.t = 0; this.phase = 0;
-    const lanes = [{ axis: 'z', dir: 1, c: -3.2, span: 170 }, { axis: 'z', dir: -1, c: 3.2, span: 170 }, { axis: 'x', dir: 1, c: 4, span: 150 }, { axis: 'x', dir: -1, c: -4, span: 150 }];
-    for (const L of lanes) { const n = L.axis === 'z' ? 7 : 3; for (let i = 0; i < n; i++) this.spawn(L, -L.span + (i + Math.random() * 0.5) * (2 * L.span / n)); }
+    const lanes = [{ axis: 'z', dir: 1, c: -3.2, span: 296 }, { axis: 'z', dir: -1, c: 3.2, span: 296 }, { axis: 'x', dir: 1, c: 4, span: 246 }, { axis: 'x', dir: -1, c: -4, span: 246 }];
+    for (const L of lanes) { const n = L.axis === 'z' ? 11 : 6; for (let i = 0; i < n; i++) this.spawn(L, -L.span + (i + Math.random() * 0.5) * (2 * L.span / n)); }
   }
   spawn(L, s) {
     const m = carModel(pick(COLORS)); this.scene.add(m);
@@ -49,7 +49,7 @@ export class Traffic {
   }
   // light state per axis: 'g' | 'y' | 'r'
   light(axis) { const t = this.t % 30; const zGreen = t < 14, zYellow = t >= 14 && t < 17, xGreen = t >= 17 && t < 27; if (axis === 'z') return zGreen ? 'g' : zYellow ? 'y' : 'r'; return xGreen ? 'g' : (t >= 27 ? 'y' : 'r'); }
-  update(dt, player) {
+  update(dt, player, extra = []) {
     this.t += dt;
     for (const sg of this.signals) { const st = this.light(sg.axis); sg.lamps.forEach((l, i) => l.m.color.copy(l.c).multiplyScalar((st === 'r' && i === 0) || (st === 'y' && i === 1) || (st === 'g' && i === 2) ? 6 : 0.08)); }
     for (const c of this.cars) {
@@ -64,6 +64,9 @@ export class Traffic {
       // player in the lane ahead
       const px = L.axis === 'z' ? player.x : player.z, pz = L.axis === 'z' ? player.z : player.x;
       if (Math.abs(px - L.c) < 2 && (pz - c.s) * L.dir > 0 && (pz - c.s) * L.dir < 12) target = 0;
+      for (const e of extra) { const ex = L.axis === 'z' ? e.x : e.z, ez = L.axis === 'z' ? e.z : e.x; if (Math.abs(ex - L.c) < 2.4 && (ez - c.s) * L.dir > 0 && (ez - c.s) * L.dir < 14) target = Math.min(target, 0); }
+      if (c.stun > 0) { c.stun -= dt; target = 0; }
+      if (c.stun > 0) c.v *= 0.9;
       c.v += Math.sign(target - c.v) * Math.min(Math.abs(target - c.v), (target < c.v ? 9 : 3) * dt);
       c.s += c.v * L.dir * dt;
       if (c.s * L.dir > L.span) c.s = -L.span * L.dir;
@@ -74,6 +77,7 @@ export class Traffic {
     }
   }
   // cars as moving obstacles for the player
+  hit(x, z, r) { const c = this.blocks(x, z, r); if (c) { c.stun = 1.5; c.v = 0; } return c; }
   blocks(x, z, r) { for (const c of this.cars) { const dx = x - c.m.position.x, dz = z - c.m.position.z, ax = c.L.axis === 'x'; if (Math.abs(ax ? dx : dz) < 2.4 + r && Math.abs(ax ? dz : dx) < 1.0 + r) return c; } return null; }
 }
 
@@ -100,13 +104,14 @@ export class Pedestrians {
       this.peds.push({ w, len, t: Math.random() * len, dir: Math.random() < 0.5 ? 1 : -1, off: rand(-1.4, 1.4), v: rand(1.1, 1.6), ph: Math.random() * 6, wait: 0, ...ped });
     }
   }
-  update(dt, player) {
+  update(dt, player, car) {
     for (const p of this.peds) {
       const [x0, z0, x1, z1] = p.w, ux = (x1 - x0) / p.len, uz = (z1 - z0) / p.len;
       const px = x0 + ux * p.t - uz * p.off, pz = z0 + uz * p.t + ux * p.off;
       const toP = Math.hypot(player.x - px, player.z - pz), ahead = ((player.x - px) * ux + (player.z - pz) * uz) * p.dir;
       let speed = p.v;
       if (toP < 1.3 && ahead > 0) { speed = 0; p.off += (p.off > 0 ? 1 : -1) * dt * 0.8; p.off = Math.max(-2, Math.min(2, p.off)); }
+      if (car && Math.abs(car.v) > 3) { const cd = Math.hypot(car.x - px, car.z - pz); if (cd < 5) { p.off += (p.off >= 0 ? 1 : -1) * dt * 6; p.off = Math.max(-2.2, Math.min(2.2, p.off)); speed = 0; if (cd < 2.2) { p.dir = -p.dir; p.off = -p.off; } } }
       p.t += speed * p.dir * dt;
       if (p.t > p.len) { p.t = p.len; p.dir = -1; } if (p.t < 0) { p.t = 0; p.dir = 1; }
       p.root.position.set(px, 0.16, pz); p.root.rotation.y = Math.atan2(ux * p.dir, uz * p.dir);

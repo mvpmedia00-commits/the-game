@@ -47,9 +47,9 @@ export function buildDistrict(scene) {
   W.add(Rt(Object.assign(M(new THREE.PlaneGeometry(900, 900), asphalt), { receiveShadow: true }), -Math.PI / 2, 0, 0));
   const walk = pavers(), curb = mat('#5a5058', 0.7);
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { // four raised blocks with curbs
-    const cx = sx * (10 + 105), cz = sz * (8 + 125);
-    const s = M(boxG(210, 0.16, 250), walk, cx, 0.08, cz); s.receiveShadow = true; W.add(s);
-    W.add(M(boxG(0.3, 0.17, 250), curb, sx * 10.15, 0.085, cz), M(boxG(210, 0.17, 0.3), curb, cx, 0.085, sz * 8.15));
+    const cx = sx * (10 + 250), cz = sz * (8 + 310);
+    const s = M(boxG(500, 0.16, 620), walk, cx, 0.08, cz); s.receiveShadow = true; W.add(s);
+    W.add(M(boxG(0.3, 0.17, 620), curb, sx * 10.15, 0.085, cz), M(boxG(500, 0.17, 0.3), curb, cx, 0.085, sz * 8.15));
   }
   const paint = neon('#e8e2d0', 0.9), yellow = neon('#d8a822', 1.1);
   const dash = new THREE.PlaneGeometry(0.16, 3); dash.rotateX(-Math.PI / 2);
@@ -59,7 +59,7 @@ export function buildDistrict(scene) {
   const im = new THREE.InstancedMesh(dash, paint, marks.length), o = new THREE.Object3D();
   marks.forEach(([x, z, r], i) => { o.position.set(x, 0.02, z); o.rotation.set(0, r ? Math.PI / 2 : 0, 0); o.updateMatrix(); im.setMatrixAt(i, o.matrix); }); W.add(im);
   for (const s of [-1, 1]) { for (const zs of [-1, 1]) W.add(M(boxG(0.14, 0.01, 290), yellow, s * 0.35, 0.02, zs * 160)); }
-  W.add(M(boxG(2.2, 0.3, 250), mat('#3a3a2e', 0.9), 0, 0.15, -136), M(boxG(2.2, 0.3, 250), mat('#3a3a2e', 0.9), 0, 0.15, 136)); // median planters
+  W.add(M(boxG(2.2, 0.3, 292), mat('#3a3a2e', 0.9), 0, 0.15, -160), M(boxG(2.2, 0.3, 292), mat('#3a3a2e', 0.9), 0, 0.15, 160)); box(-1.1, 1.1, -306, -14); box(-1.1, 1.1, 14, 306); // median planters
   const bars = [];
   for (const [cx, cz, along] of [[0, -10.5, 'x'], [0, 10.5, 'x'], [-12, 0, 'z'], [12, 0, 'z']]) for (let k = -9; k <= 9; k += 1.3) bars.push(along === 'x' ? [cx + k, cz, 0] : [cx, cz + k, 1]);
   const barG = new THREE.PlaneGeometry(0.6, 3.2); barG.rotateX(-Math.PI / 2);
@@ -175,27 +175,33 @@ export function buildDistrict(scene) {
   building(15, 40, 84, 104, 6, 'warm', '#ffcc33'); shopfront(15, 40, 84, 104, 'w', 'DIAMOND DINER', '#ffcc33');
   building(62, 96, 16, 108, 44, 'warm', '#3ad7ff');
   pois.push({ id: 'studio', name: 'MVP Studios', x: studioDoor.x, z: studioDoor.z, r: 3, prompt: 'Enter MVP Studios' });
+  pois.push({ id: 'velvet', name: 'The Velvet Room', x: velvetDoor.x - 0.6, z: velvetDoor.z + 1.4, r: 2.6, prompt: 'Enter The Velvet Room' });
   zones.push({ name: 'MVP Studios', minX: 10, maxX: 60, minZ: 12, maxZ: 56 }, { name: 'Chapel of Love', minX: 10, maxX: 40, minZ: 56, maxZ: 82 });
   zones.push({ name: 'Las Vegas Blvd', minX: -10, maxX: 10, minZ: -500, maxZ: 500 }, { name: 'Fremont Ave', minX: -500, maxX: 500, minZ: -8, maxZ: 8 });
 
-  // ---------- street furniture: lights, palms, traffic lights, hydrants, benches
+  // ---------- street furniture (instanced so the long strip stays fast)
   const pole = mat('#26242a', 0.45, 0.7), lightPts = [];
-  for (const sx of [-1, 1]) for (let z = -100; z <= 100; z += 20) if (Math.abs(z) > 12) lightPts.push([sx * 10.9, z, sx]);
-  for (const sz of [-1, 1]) for (let x = -90; x <= 90; x += 20) if (Math.abs(x) > 14) lightPts.push([x, sz * 8.9, 0, sz]);
+  for (const sx of [-1, 1]) for (let z = -290; z <= 290; z += 22) if (Math.abs(z) > 12) lightPts.push([sx * 10.9, z, -sx * 1.6, 0]);
+  for (const sz of [-1, 1]) for (let x = -240; x <= 240; x += 22) if (Math.abs(x) > 14) lightPts.push([x, sz * 8.9, 0, -sz * 1.6]);
+  const inst = (geo, m, list, set) => { const im = new THREE.InstancedMesh(geo, m, list.length); list.forEach((p, i) => { o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1); set(o, p); o.updateMatrix(); im.setMatrixAt(i, o.matrix); }); W.add(im); return im; };
+  inst(cylG(0.11, 0.15, 8, 10), pole, lightPts, (o, [x, z]) => o.position.set(x, 4, z));
+  inst(boxG(1, 0.1, 0.1), pole, lightPts, (o, [x, z, ax, az]) => { o.position.set(x + ax / 2, 8, z + az / 2); o.scale.set(1.7, 1, 1); o.rotation.y = ax ? 0 : Math.PI / 2; });
+  inst(boxG(0.7, 0.18, 0.4), pole, lightPts, (o, [x, z, ax, az]) => o.position.set(x + ax, 7.9, z + az));
+  inst(boxG(0.55, 0.05, 0.3), neon('#ffd9a0', 8), lightPts, (o, [x, z, ax, az]) => o.position.set(x + ax, 7.8, z + az));
   const glowM = new THREE.MeshBasicMaterial({ map: glowTex, color: new THREE.Color(1.0, 0.62, 0.32), transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false });
-  for (const [x, z, sx, sz] of lightPts) {
-    W.add(M(cylG(0.11, 0.15, 8, 10), pole, x, 4, z)); circles.push({ x, z, r: 0.25 });
-    const ax = sx ? -sx * 1.6 : 0, az = sz ? -sz * 1.6 : 0;
-    W.add(Rt(M(boxG(Math.abs(ax) + 0.1 || 0.1, 0.1, Math.abs(az) + 0.1 || 0.1), pole, x + ax / 2, 8, z + az / 2), 0, 0, 0));
-    W.add(M(boxG(0.7, 0.18, 0.4), pole, x + ax, 7.9, z + az), M(boxG(0.55, 0.05, 0.3), neon('#ffd9a0', 8), x + ax, 7.8, z + az));
-    W.add(Rt(M(planeG(12, 12), glowM, x + ax, 0.19, z + az), -Math.PI / 2, 0, 0));
-  }
+  const gg = new THREE.PlaneGeometry(12, 12); gg.rotateX(-Math.PI / 2);
+  inst(gg, glowM, lightPts, (o, [x, z, ax, az]) => o.position.set(x + ax, 0.19, z + az));
+  for (const [x, z] of lightPts) circles.push({ x, z, r: 0.25 });
   const trunk = mat('#5a4636', 0.95), leaf = mat('#1f5a2c', 0.8, 0, { side: THREE.DoubleSide });
   const frond = new THREE.PlaneGeometry(0.6, 3.2, 1, 6); frond.translate(0, 1.6, 0);
   { const p = frond.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setZ(i, -Math.pow(y / 3.2, 2) * 1.1); p.setX(i, p.getX(i) * Math.sin(Math.PI * y / 3.2 * 0.9 + 0.1)); } frond.computeVertexNormals(); }
-  const palm = (x, z, h) => { const g = new THREE.Group(); g.position.set(x, 0, z); g.add(M(cylG(0.18, 0.28, h, 10), trunk, 0, h / 2, 0)); const cr = new THREE.Group(); cr.position.y = h; g.add(cr); for (let i = 0; i < 10; i++) { const f = new THREE.Mesh(frond, leaf); f.rotation.set(-1.0 - srand() * 0.4, i / 10 * Math.PI * 2, 0, 'YXZ'); f.castShadow = true; cr.add(f); } W.add(g); circles.push({ x, z, r: 0.4 }); };
-  for (let z = -130; z <= 130; z += 16) if (Math.abs(z) > 20) palm(0, z, 9 + srand() * 3);
-  for (const [x, z] of [[-33, -45], [-33, -22], [-19, -45], [-30, 40], [-62, 32], [-62, 66], [-30, 68]]) palm(x, z, 8 + srand() * 3);
+  const palms = [];
+  for (let z = -290; z <= 290; z += 18) if (Math.abs(z) > 20) palms.push([0, z, 9 + srand() * 3]);
+  for (const [x, z] of [[-33, -45], [-33, -22], [-19, -45], [-30, 40], [-62, 32], [-62, 66], [-30, 68]]) palms.push([x, z, 8 + srand() * 3]);
+  for (const [x, z] of palms) circles.push({ x, z, r: 0.4 });
+  inst(cylG(0.18, 0.28, 1, 10), trunk, palms, (o, [x, z, h]) => { o.position.set(x, h / 2, z); o.scale.set(1, h, 1); });
+  const fr = []; palms.forEach(([x, z, h]) => { for (let i = 0; i < 10; i++) fr.push([x, z, h, i / 10 * Math.PI * 2, -1.0 - srand() * 0.4]); });
+  const fim = inst(frond, leaf, fr, (o, [x, z, h, ry, rx]) => { o.position.set(x, h, z); o.rotation.set(rx, ry, 0, 'YXZ'); }); fim.castShadow = true;
   // traffic lights at the four corners
   const signals = [];
   for (const [x, z, ry, axis] of [[-11, -9.5, 0, 'z'], [11, 9.5, Math.PI, 'z'], [-11.5, 9, Math.PI / 2, 'x'], [11.5, -9, -Math.PI / 2, 'x']]) {
@@ -210,24 +216,64 @@ export function buildDistrict(scene) {
 
   // ---------- distant skyline + mountains (not walkable)
   const skyFacade = facadeMat('cool', 14, 14); skyFacade.emissiveIntensity = 1.2;
-  const towers = []; for (let i = 0; i < 70; i++) { const a = srand() * Math.PI * 2, r = 170 + srand() * 170, w = 14 + srand() * 22; towers.push([Math.cos(a) * r, Math.sin(a) * r, w, 30 + srand() * 140]); }
+  const towers = []; for (let i = 0; i < 140 && towers.length < 80; i++) { const a = srand() * Math.PI * 2, r = 180 + srand() * 260, w = 14 + srand() * 22, x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.abs(x) < 75 || Math.abs(z) < 75) continue; towers.push([x, z, w, 30 + srand() * 140]); }
   const tg = new THREE.BoxGeometry(1, 1, 1); tg.translate(0, 0.5, 0);
   const ti = new THREE.InstancedMesh(tg, skyFacade, towers.length); towers.forEach(([x, z, w, h], i) => { o.position.set(x, 0, z); o.rotation.set(0, srand(), 0); o.scale.set(w, h, w); o.updateMatrix(); ti.setMatrixAt(i, o.matrix); }); W.add(ti);
   const needle = new THREE.Group(); needle.position.set(60, 0, -300); W.add(needle);
   needle.add(M(cylG(3, 6, 240, 16), mat('#8a8490', 0.5, 0.4), 0, 120, 0), M(cylG(16, 12, 14, 24), mat('#3a3440', 0.4, 0.6), 0, 240, 0), M(cylG(16.2, 16.2, 1, 24), neon('#ff2a4a', 5), 0, 244, 0), M(cylG(1, 0.2, 30, 8), mat('#aaa', 0.4, 0.8), 0, 262, 0));
   for (let i = 0; i < 9; i++) { const s = 60 + srand() * 90; const m = M(new THREE.ConeGeometry(s, s * 0.35, 7), mat('#1a0e18', 1), Math.cos(i / 9 * 6.28) * 480, s * 0.17, Math.sin(i / 9 * 6.28) * 480); m.scale.y = 0.7; W.add(m); }
 
-  // invisible edge of the playable area: beyond it the boulevard keeps going into the haze
-  const bounds = { minX: -98, maxX: 98, minZ: -112, maxZ: 112 };
-  const NPC = { ruby: { x: 12.3, z: -24.5, ry: -Math.PI / 2 }, bouncer: { x: 13.6, z: velvetDoor.z + 0.8, ry: -Math.PI / 2 }, dee: { x: lensDoor.x - 0.4, z: lensDoor.z - 1.2, ry: -Math.PI / 2 } };
-  const spawn = { x: 11.6, z: 30, yaw: -Math.PI / 2 }; // on the sidewalk by MVP Studios, next to the car
-  const parked = [{ x: 7.6, z: 31, ry: Math.PI, color: '#c8141f', mine: true }, { x: -7.6, z: -44, ry: 0, color: '#1a1a22' }, { x: 7.6, z: -52, ry: Math.PI, color: '#e8e2d8' }, { x: -7.6, z: 58, ry: 0, color: '#3a5a8a' }];
+  // ---------- the extended strip (cruising) with filler blocks
+  const NAMES = ['GOLDEN SPUR', 'LUCKY 7s', 'SILVER DOLLAR', 'OASIS BAIL BONDS', 'TIKI LANES', 'STARLITE', 'SAHARA LOFTS', 'NEON NOODLE', 'PALMS INN', 'EL DORADO', 'HIGH ROLLER', 'CHERRY BAR', 'BLUE ANGEL', 'JACKPOT JOE', 'MIDNIGHT TATTOO', 'VIVA ARCADE', 'SUNSET PAWN', 'ACE HOTEL', 'ROYAL FLUSH', 'MOONLIGHT MOTEL'];
+  const NEONS = ['#ff2a4a', '#ff4fd8', '#3ad7ff', '#ffcc33', '#9b6bff', '#ff8a3a', '#7cff6b'];
+  let ni = 0;
+  for (const sz of [-1, 1]) for (const sx of [-1, 1]) for (let z = 114; z < 296;) { // boulevard frontage
+    const d = 26 + srand() * 14, depth = 20 + srand() * 25, h = 10 + srand() * 50, z0 = sz * z, z1 = sz * (z + d - 3);
+    const x0 = sx > 0 ? 15 : -15 - depth, x1 = sx > 0 ? 15 + depth : -15, c = NEONS[ni % NEONS.length];
+    building(x0, x1, Math.min(z0, z1), Math.max(z0, z1), h, srand() < 0.5 ? 'warm' : 'cool', srand() < 0.6 ? c : null);
+    shopfront(x0, x1, Math.min(z0, z1), Math.max(z0, z1), sx > 0 ? 'w' : 'e', NAMES[ni++ % NAMES.length], c, { light: false });
+    z += d;
+  }
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (let x = 100; x < 246;) { // Fremont frontage
+    const d = 24 + srand() * 14, depth = 18 + srand() * 20, h = 8 + srand() * 40, x0 = sx * x, x1 = sx * (x + d - 3);
+    const z0 = sz > 0 ? 13 : -13 - depth, z1 = sz > 0 ? 13 + depth : -13, c = NEONS[ni % NEONS.length];
+    building(Math.min(x0, x1), Math.max(x0, x1), z0, z1, h, srand() < 0.5 ? 'warm' : 'cool', srand() < 0.6 ? c : null);
+    shopfront(Math.min(x0, x1), Math.max(x0, x1), z0, z1, sz > 0 ? 'n' : 's', NAMES[ni++ % NAMES.length], c, { light: false });
+    x += d;
+  }
+  const stripe = canvasTex(256, 64, (g) => { for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#f2eee8' : '#e0202e'; g.beginPath(); g.moveTo(i * 32, 0); g.lineTo(i * 32 + 32, 0); g.lineTo(i * 32, 64); g.lineTo(i * 32 - 32, 64); g.fill(); } });
+  stripe.wrapS = THREE.RepeatWrapping; stripe.repeat.set(4, 1);
+  const blinkers = [];
+  const barricade = (x, z, len, alongX) => {
+    const g = new THREE.Group(); g.position.set(x, 0, z); if (!alongX) g.rotation.y = Math.PI / 2; W.add(g);
+    g.add(M(boxG(len, 0.9, 0.5), new THREE.MeshStandardMaterial({ map: stripe, roughness: 0.6 }), 0, 0.7, 0), M(boxG(len, 0.25, 0.6), mat('#8a8a8a', 0.9), 0, 0.12, 0));
+    for (let k = -len / 2 + 1; k < len / 2; k += 3) { const b = M(sphG(0.15, 8, 6), neon('#ffb020', 0.3), k, 1.3, 0); g.add(b); blinkers.push(b); }
+    const s = signMesh('ROAD CLOSED', '#ffffff', 6, 1); s.position.set(0, 2, 0.3); g.add(s);
+  };
+  barricade(0, -302, 20, true); barricade(0, 302, 20, true); barricade(-252, 0, 16, false); barricade(252, 0, 16, false);
+  // premiere red carpet at Crown Casino (shown for the finale)
+  const premiere = new THREE.Group(); premiere.visible = false; W.add(premiere);
+  premiere.add(M(boxG(14, 0.04, 3.2), mat('#a00c18', 0.9), -24, 0.18, -50));
+  const wallT = canvasTex(512, 256, (g) => { g.fillStyle = '#12060a'; g.fillRect(0, 0, 512, 256); g.font = '700 40px Cinzel, Georgia, serif'; g.textAlign = 'center'; for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { g.fillStyle = (x + y) % 2 ? '#e0202e' : '#f3e9e4'; g.fillText((x + y) % 2 ? 'MVP' : 'MEDIA', 64 + x * 128, 50 + y * 62); } });
+  const sr = M(boxG(0.2, 3.4, 8), new THREE.MeshStandardMaterial({ map: wallT, roughness: 0.6 }), -32, 1.7, -50); premiere.add(sr);
+  for (const z of [-51.8, -48.2]) for (let x = -30; x <= -18; x += 2.4) premiere.add(M(cylG(0.05, 0.08, 1, 10), mat('#e8b64c', 0.2, 1), x, 0.66, z));
+  // ---------- where people stand (story contacts) and the edge of the map
+  const NPC = {
+    ruby: { x: 12.3, z: -24.5, ry: -Math.PI / 2 }, bouncer: { x: 13.6, z: velvetDoor.z + 0.8, ry: -Math.PI / 2 }, tony: { x: 12.4, z: velvetDoor.z - 2.2, ry: -Math.PI / 2 },
+    dee: { x: lensDoor.x - 0.4, z: lensDoor.z - 1.2, ry: -Math.PI / 2 }, editor: { x: -19.5, z: -57, ry: Math.PI / 2 }, landlord: { x: -50, z: 26.5, ry: Math.PI },
+    jade: { x: 12.6, z: 36, ry: -Math.PI / 2 }, coco: { x: 12.6, z: -82, ry: -Math.PI / 2 }, nova: { x: -46, z: 36.6, ry: Math.PI }, carpet: { x: -24, z: -50, ry: Math.PI / 2 },
+  };
+  const inBounds = (x, z) => (x > -98 && x < 98 && z > -112 && z < 112) || (Math.abs(x) < 15 && Math.abs(z) < 300) || (Math.abs(z) < 13 && Math.abs(x) < 250);
+  const bounds = { minX: -250, maxX: 250, minZ: -300, maxZ: 300 };
+  const spawn = { x: 11.6, z: 30, yaw: -Math.PI / 2 };
+  const parked = [{ x: -7.6, z: -44, ry: 0, color: '#1a1a22' }, { x: 7.6, z: -52, ry: Math.PI, color: '#e8e2d8' }, { x: -7.6, z: 58, ry: 0, color: '#3a5a8a' }, { x: 7.6, z: 160, ry: Math.PI, color: '#c8a040' }, { x: -7.6, z: -190, ry: 0, color: '#7a1a1a' }];
   for (const p of parked) box(p.x - 1.05, p.x + 1.05, p.z - 2.3, p.z + 2.3);
-  // pedestrians walk these sidewalk segments
-  const walks = [[12.6, -100, 12.6, -12], [12.6, 12, 12.6, 104], [-12.6, -100, -12.6, -12], [-12.6, 12, -12.6, 104], [-90, -10.8, -14, -10.8], [14, -10.8, 48, -10.8], [-90, 10.8, -14, 10.8], [14, 10.8, 60, 10.8]];
+  const myCarSpot = { x: 7.6, z: 31, a: Math.PI }; // heading north, kerbside outside MVP Studios
+  const walks = [[12.6, -290, 12.6, -12], [12.6, 12, 12.6, 290], [-12.6, -290, -12.6, -12], [-12.6, 12, -12.6, 290], [-240, -10.8, -14, -10.8], [14, -10.8, 240, -10.8], [-240, 10.8, -14, 10.8], [14, 10.8, 240, 10.8]];
   const update = (t) => {
     jets.forEach((j, i) => { j.scale.y = 0.85 + Math.sin(t * 3 + i) * 0.15; });
     crown.rotation.y = t * 0.05;
+    const on = Math.sin(t * 6) > 0; for (const b of blinkers) b.material.color.setRGB(on ? 3 : 0.2, on ? 1.8 : 0.1, 0);
   };
-  return { colliders, circles, pois, zones, bounds, NPC, spawn, parked, walks, signals, update };
+  return { colliders, circles, pois, zones, bounds, inBounds, NPC, spawn, parked, myCarSpot, walks, signals, update, premiere, doors: { velvet: velvetDoor, lens: lensDoor, studio: studioDoor } };
 }
