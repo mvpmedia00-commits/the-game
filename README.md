@@ -1,6 +1,6 @@
 # the-game
 
-MVP Media's games, playable in the browser. No build step.
+MVP Media's games, playable in the browser. No build step. **Read [GAME.md](GAME.md) for the full game guide.**
 
 | Folder | What it is |
 |---|---|
