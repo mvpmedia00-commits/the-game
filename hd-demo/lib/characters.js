@@ -85,7 +85,8 @@ function walkPose(rig, ph, amt, t = 1) {
     shL: [s * 0.5 * amt, 0, 0.1], shR: [-s * 0.5 * amt, 0, -0.1], elL: [-0.25 - 0.3 * amt, 0, 0], elR: [-0.25 - 0.3 * amt, 0, 0], sp: [0.06 * amt, 0, 0], hd: [-0.04 * amt, 0, 0], hips: [0, s * 0.08 * amt, 0] };
   if (rig.hold) Object.assign(p, HOLD);
   setPose(rig, p, t);
-  rig.root.children[0].position.y = (rig.hips.userData.y0 ??= rig.hips.position.y) + Math.abs(c) * 0.035 * amt;
+  const bob = rig.bobNode || rig.root.children[0]; // imported rigs bob their hip bone, in their own units
+  bob.position.y = (bob.userData.y0 ??= bob.position.y) + Math.abs(c) * 0.035 * amt * (rig.bobScale || 1);
 }
 // Model poses for photo shoots
 const POSES = [

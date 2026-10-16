@@ -50,6 +50,7 @@ for (const [key, s] of Object.entries(SLOTS)) {
   s.key = key; s.holder = new THREE.Group(); s.holder.position.set(...s.pos); s.holder.rotation.y = s.ry; cast.add(s.holder);
   s.springs = new SpringSystem();
 }
+const RIG_JOINTS = ['hips', 'spine', 'head', 'shL', 'elL', 'shR', 'elR', 'hpL', 'knL', 'hpR', 'knR'];
 function clearSlot(s) { if (s.model) s.holder.remove(s.model); s.model = null; s.rig = null; s.mixer = null; s.clips = []; s.springs.clear(); s.found = {}; }
 function useStandIn(s) {
   clearSlot(s);
@@ -58,18 +59,29 @@ function useStandIn(s) {
   s.found = {}; for (const sp of rig.springs) s.found[sp.kind] = (s.found[sp.kind] || 0) + 1;
   refreshUI();
 }
+// Bounds from the stored (bind-pose) geometry: Box3.setFromObject would skin rigged meshes with bones that
+// haven't been updated yet and report a wrong size. Rigged meshes also skip frustum culling (they move).
+function restBox(root) {
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3(), b = new THREE.Box3();
+  root.traverse(o => { if (!o.isMesh) return; if (o.isSkinnedMesh) o.frustumCulled = false; if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); box.union(b.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld)); });
+  return box;
+}
 const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
 function useGLTF(s, gltf, name) {
   clearSlot(s);
   const root = gltf.scene;
   root.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; if (o.material && o.material.isMeshStandardMaterial) o.material.envMapIntensity = 1; } });
   // fit to the slot's height, feet on the floor, centred
-  const box = new THREE.Box3().setFromObject(root), size = box.getSize(new THREE.Vector3());
+  const box = restBox(root), size = box.getSize(new THREE.Vector3());
   const k = s.height / Math.max(0.01, size.y); root.scale.setScalar(k);
-  box.setFromObject(root); const c = box.getCenter(new THREE.Vector3());
+  box.copy(restBox(root)); const c = box.getCenter(new THREE.Vector3());
   root.position.x -= c.x; root.position.z -= c.z; root.position.y -= box.min.y;
   s.model = root; s.holder.add(root); root.updateMatrixWorld(true);
   s.found = s.springs.scan(root);
+  // models rigged with the game's joint names (tools/autorig) are driven by the same poses, walk and dance as the stand-ins
+  const B = {}; root.traverse(o => { if (o.isBone) B[o.name] = o; });
+  if (RIG_JOINTS.every(k => B[k])) { s.rig = { root }; for (const k of RIG_JOINTS) s.rig[k] = B[k]; s.rig.cur = null; s.rig.bobNode = B.hips; s.rig.bobScale = 1 / s.height; }
   s.clips = gltf.animations || [];
   s.animated = new Set(s.clips.flatMap(c => c.tracks.map(tr => tr.name.split('.')[0])));
   if (s.clips.length) { s.mixer = new THREE.AnimationMixer(root); s.action = s.mixer.clipAction(s.clips[0]); s.action.play(); s.clipIndex = 0; }

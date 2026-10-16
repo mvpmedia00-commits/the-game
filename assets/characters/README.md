@@ -5,6 +5,7 @@ Put finished characters here. The HD demo loads these automatically:
 | File | Slot |
 |---|---|
 | `mvp.glb` | MVP |
+| `mvp.glb` | Tripo AI (HD model, T-pose), by Matthew | Reduced from 62.6 MB / 1.9M triangles to 1.05 MB / 67k triangles, then auto-rigged with the game's joint names (hips, spine, head, shL/elL/shR/elR, hpL/knL/hpR/knR). The HD demo drives him with the same poses, walk and dance as the code-built characters. |
 | `ruby.glb` | Ruby |
 
 ## Sending a new character
@@ -35,4 +36,5 @@ Character Creator 4 names its chest bones `CC_Base_L_Breast` / `CC_Base_R_Breast
 
 | File | Source | Notes |
 |---|---|---|
+| `mvp.glb` | Tripo AI (HD model, T-pose), by Matthew | Reduced from 62.6 MB / 1.9M triangles to 1.05 MB / 67k triangles, then auto-rigged with the game's joint names (hips, spine, head, shL/elL/shR/elR, hpL/knL/hpR/knR). The HD demo drives him with the same poses, walk and dance as the code-built characters. |
 | `ruby.glb` | Tripo AI (HD model), by Matthew | Shrunk from 61.5 MB / 2M triangles to 0.78 MB / 58k triangles (weld, simplify, 2K WebP textures, meshopt). **No skeleton yet**, so she stands still. Re-export from Tripo with **Rig** turned on to make her walk, pose and dance. |
