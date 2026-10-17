@@ -16,7 +16,7 @@ function relQ(obj, root, out) {
   return out;
 }
 
-export function mixamoRig(root) {
+export function mixamoRig(root, opts = {}) {
   const bones = {};
   root.traverse(o => { if (o.isBone) bones[strip(o.name)] = o; });
   if (!ORDER.every(k => bones[MAP[k]])) return null;
@@ -43,7 +43,9 @@ export function mixamoRig(root) {
   for (const k of ORDER) proxy[k].rotation.set(0, 0, 0);
   const rig = { root, cur: null, model: B, bobNode: new THREE.Object3D(), retarget: true };
   for (const k of ORDER) rig[k] = proxy[k];
+  rig.armPitch = opts.armPitch || 0; // per-model correction: swing the arms forward (negative) or back at the shoulder
   rig.apply = () => {
+    if (rig.armPitch) { proxy.shL.rotation.x += rig.armPitch; proxy.shR.rotation.x += rig.armPitch; } // setPose rewrites these every frame
     proxyWorld();
     for (const k of ORDER) {
       tq.copy(pw[k]).multiply(offset[k]);                    // desired root-relative rotation of the bone

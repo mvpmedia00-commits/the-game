@@ -45,7 +45,7 @@ composer.addPass(new OutputPass());
 const cast = new THREE.Group();
 const SLOTS = {
   mvp: { label: 'MVP', file: '../assets/characters/mvp.glb', pos: [-0.45, 0, 0], ry: 0.18, height: 1.9, look: Object.assign({}, C.MVP_LOOK, { camera: false, handCam: 'both' }) },
-  ruby: { label: 'Ruby', file: '../assets/characters/ruby.glb', pos: [0.42, 0, 0.28], ry: -0.42, height: 1.68, look: Object.assign({ outfit: 'two' }, C.TALENT.ruby.look, { handCam: 'L' }) },
+  ruby: { label: 'Ruby', file: '../assets/characters/ruby.glb', armPitch: -0.22, pos: [0.42, 0, 0.28], ry: -0.42, height: 1.68, look: Object.assign({ outfit: 'two' }, C.TALENT.ruby.look, { handCam: 'L' }) },
 };
 for (const [key, s] of Object.entries(SLOTS)) {
   s.key = key; s.holder = new THREE.Group(); s.holder.position.set(...s.pos); s.holder.rotation.y = s.ry; cast.add(s.holder);
@@ -79,7 +79,7 @@ function useGLTF(s, gltf, name) {
   clearSlot(s);
   const root = gltf.scene;
   root.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; if (o.material && o.material.isMeshStandardMaterial) o.material.envMapIntensity = 1; } });
-  const mixamo = mixamoRig(root); // Mixamo skeletons (Tripo, Mixamo, ActorCore) get the game's poses too; also turns the model to face +z
+  const mixamo = mixamoRig(root, { armPitch: s.armPitch }); // Mixamo skeletons (Tripo, Mixamo, ActorCore) get the game's poses too; also turns the model to face +z
   // fit to the slot's height, feet on the floor, centred
   const box = restBox(root), size = box.getSize(new THREE.Vector3());
   const k = s.height / Math.max(0.01, size.y); root.scale.setScalar(k);

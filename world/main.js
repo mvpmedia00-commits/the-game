@@ -14,6 +14,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import * as C from '../hd-demo/lib/characters.js';
 import { buildStudio } from '../hd-demo/lib/studio.js';
 import { SpringSystem } from '../hd-demo/lib/springs.js';
+import { loadCharacter } from '../hd-demo/lib/glbchar.js';
 import { buildDistrict } from './lib/district.js?v=block-3';
 import { Traffic, Pedestrians, carModel } from './lib/npcs.js';
 import { buildClub } from './lib/club.js?v=block-3';
@@ -138,6 +139,22 @@ const noReflect = o => o.traverse(c => c.layers.set(1));
 camera.layers.enable(1); moon.shadow.camera.layers.enable(1);
 for (const n of Object.values(NPCS)) noReflect(n.rig.root);
 for (const p of peds.peds) noReflect(p.root);
+// Real character models (assets/characters/*.glb, Mixamo-rigged) take over from the code-built MVP and Ruby
+// as soon as they load; the code-built versions stay as the fallback if a file is missing.
+function adoptRig(old, next) {
+  springs.joints = springs.joints.filter(j => { for (let o = j.obj; o; o = o.parent) if (o === old.root) return false; return true; });
+  next.root.position.copy(old.root.position); next.root.rotation.copy(old.root.rotation); next.root.visible = old.root.visible;
+  const parent = old.root.parent; if (parent) { parent.add(next.root); parent.remove(old.root); }
+  springs.scan(next.modelRoot);
+}
+loadCharacter('../assets/characters/ruby.glb', { name: 'Ruby', height: 1.68, armPitch: -0.22 }).then(rig => {
+  if (!rig) return; const n = NPCS.ruby; adoptRig(n.rig, rig); noReflect(rig.root); n.rig = rig;
+}).catch(e => console.warn('Ruby model unavailable, using the code-built Ruby', e));
+loadCharacter('../assets/characters/mvp.glb', { name: 'MVP', height: 1.85 }).then(rig => {
+  if (!rig) return;
+  rig.prop = C.makeDSLR(); rig.propMode = 'both'; rig.hold = true; rig.root.add(rig.prop); // camera in both hands
+  adoptRig(mvp, rig); for (const k of Object.keys(mvp)) delete mvp[k]; Object.assign(mvp, rig); // same object: every mvp.* reference keeps working
+}).catch(e => console.warn('MVP model unavailable, using the code-built MVP', e));
 let freeModel = null; // freelance model for gigs
 const P = { x: save.x ?? D.spawn.x, z: save.z ?? D.spawn.z, a: D.spawn.yaw, ry: D.spawn.yaw, walk: 0, move: 0 };
 if (!D.inBounds(P.x, P.z)) { P.x = D.spawn.x; P.z = D.spawn.z; }
@@ -198,6 +215,7 @@ function updateNPCs(dt, t) {
     else if (pl.pose === 'pose') { if (n.poseT > 3) { n.poseT = 0; n.pose = (n.pose + 1) % POSE_LIST.length; } C.setPose(n.rig, POSE_LIST[n.pose], Math.min(1, dt * 4)); n.peak = n.poseT > 0.9 && n.poseT < 2.6 ? 1 : 0.35; }
     else if (pl.pose === 'guard') C.setPose(n.rig, { shL: [-0.3, 0, -0.35], elL: [-1.3, 0, 0], shR: [-0.3, 0, 0.35], elR: [-1.3, 0, 0], hpL: [0, 0, 0.1], hpR: [0, 0, -0.1] }, Math.min(1, dt * 4));
     else C.setPose(n.rig, { sp: [0.01, Math.sin(t * 0.5 + n.poseT) * 0.12, 0], hd: [0, Math.sin(t * 0.4 + n.poseT) * 0.35, 0], shL: [0, 0, 0.55], elL: [-0.4, 0, -1.6], hpR: [-0.08, 0, 0], knR: [0.18, 0, 0] }, Math.min(1, dt * 3));
+    if (n.rig.apply) n.rig.apply(); // model rigs: copy this frame's pose onto the bones
   }
 }
 
@@ -259,8 +277,9 @@ function shootTargets() {
 }
 function scoreShot(n) {
   n.rig.root.updateMatrixWorld(true);
-  const head = new THREE.Vector3(0, 0.11, 0); n.rig.head.localToWorld(head);
-  const top = new THREE.Vector3(0, 0.28, 0); n.rig.head.localToWorld(top);
+  let head, top;
+  if (n.rig.headBone) { head = n.rig.headBone.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.08, 0)); top = head.clone().add(new THREE.Vector3(0, 0.17, 0)); } // model rigs: real head bone
+  else { head = new THREE.Vector3(0, 0.11, 0); n.rig.head.localToWorld(head); top = new THREE.Vector3(0, 0.28, 0); n.rig.head.localToWorld(top); }
   const h = head.clone().project(camera), tp = top.clone().project(camera), ft = n.rig.root.position.clone().project(camera);
   if (h.z > 1 || Math.abs(h.x) > 1 || Math.abs(h.y) > 1) return null;
   const u = (h.x + 1) / 2, v = (1 - h.y) / 2;
@@ -558,6 +577,7 @@ function update(dt) {
     const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), run = keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(stick.f, stick.r) > 0.92;
     moveChar(P, fx * f - fz * r, fz * f + fx * r, run ? 5.6 : 2.3, dt, mvp);
     if (P.move <= 0.05) C.setPose(mvp, Object.assign({ sp: [0.02 + Math.sin(T * 1.6) * 0.015, 0, 0] }, C.HOLD), Math.min(1, dt * 8));
+    if (mvp.apply) mvp.apply(); // model rig: copy the pose onto the bones before the camera finds the hands
     C.updProps(mvp);
   }
   updateNPCs(dt, T);

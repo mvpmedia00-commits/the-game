@@ -348,6 +348,16 @@ The world game still uses the code-built characters; swapping the real models in
 
 ---
 
+## 12c. Real character models (MVP and Ruby)
+
+- `assets/characters/mvp.glb` and `ruby.glb` are Tripo models with Mixamo skeletons. When the files are present they replace the code-built MVP and Ruby, in the world and in the HD demo; if a file is missing, the code-built version stays.
+- `hd-demo/lib/retarget.js` lets the game's own poses, walk cycle and dances drive any Mixamo skeleton. The poses rotate invisible joints laid out like the code-built rigs, and `apply()` copies them onto the model's bones every frame. `armPitch` corrects arms that hang too far back (Ruby uses -0.22).
+- `hd-demo/lib/glbchar.js` → `loadCharacter(url, { height, armPitch })` loads, sizes and rigs a model. MVP gets his DSLR in both hands, and photo scoring uses the model's real head bone.
+- Ruby's file was reworked in bind space:
+  - knees separated;
+  - arms 10% shorter and 6% fuller;
+  - spring bones added for her chest, afro and four tutu panels, so they bounce with the physics slider.
+
 ## 13. Testing and debugging
 
 - `window.__world` in the browser console exposes the game state: `__world.save` (edit cash, story, etc.), `__world.startMission(__world.STORY[3], 'story')`, `__world.enter('club')`, `__world.update(0.033)` to step one frame.
