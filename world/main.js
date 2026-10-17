@@ -58,13 +58,14 @@ composer.addPass(new OutputPass());
 let AC = null, master = null, engine = null, music = null;
 // sound settings (phone menu): background music and spoken dialogue
 const soundPrefs = (() => { try { return Object.assign({ music: true, voices: true }, JSON.parse(localStorage.getItem('mvp_sound') || '{}')); } catch (e) { return { music: true, voices: true }; } })();
-const voices = new Voices(); voices.on = soundPrefs.voices;
+const voices = new Voices('../assets/voices/'); voices.on = soundPrefs.voices; // recorded lines live in assets/voices/
 function setSound(k, v) { soundPrefs[k] = v; try { localStorage.setItem('mvp_sound', JSON.stringify(soundPrefs)); } catch (e) {} if (k === 'music' && music) music.setOn(v); if (k === 'voices') { voices.on = v; if (!v) voices.stop(); } }
 function initAudio() {
+  voices.unlock();
   if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   try { AC = new (window.AudioContext || window.webkitAudioContext)(); master = AC.createGain(); master.gain.value = 0.45; master.connect(AC.destination);
     const o = AC.createOscillator(), f = AC.createBiquadFilter(), g = AC.createGain(); o.type = 'sawtooth'; o.frequency.value = 40; f.type = 'lowpass'; f.frequency.value = 380; g.gain.value = 0; o.connect(f); f.connect(g); g.connect(master); o.start(); engine = { o, g };
-    music = new Music(AC, master); music.setOn(soundPrefs.music);
+    music = new Music(AC, master); music.setOn(soundPrefs.music); voices.attach(AC, AC.destination);
   } catch (e) { AC = null; }
 }
 function tone(f, d, type = 'sine', v = 0.1, slide = 0, delay = 0) { if (!AC) return; const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain(); o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f + slide), t + d); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + d); o.connect(g); g.connect(master); o.start(t); o.stop(t + d + 0.02); }
@@ -434,9 +435,9 @@ for (const ev of ['pointerdown', 'pointerup', 'pointercancel']) $('#brakebtn').a
 
 // ---------- UI
 let dialog = null;
-function talk(lines, done) { if (!lines.length) { done && done(); return; } dialog = { lines, i: 0, done }; showLine(); }
-function showLine() { const [who, text] = dialog.lines[dialog.i]; $('#dlg-who').textContent = who; $('#dlg-text').textContent = text; $('#dialog').hidden = false;
-  voices.say(who, text, () => music && music.setDuck(0.3), () => music && music.setDuck(1)); } // read the line aloud, music ducks under it
+function talk(lines, done, opts = {}) { if (!lines.length) { done && done(); return; } dialog = { lines, i: 0, done, phone: !!opts.phone }; showLine(); }
+function showLine() { const [who, text] = dialog.lines[dialog.i], onPhone = dialog.phone && who !== 'MVP'; $('#dlg-who').textContent = (onPhone ? '📞 ' : '') + who; $('#dlg-text').textContent = text; $('#dialog').hidden = false;
+  voices.say(who, text, () => music && music.setDuck(0.3), () => music && music.setDuck(1), { phone: onPhone }); } // read the line aloud, music ducks under it
 function advance() { sfx('click'); voices.stop(); dialog.i++; if (dialog.i >= dialog.lines.length) { if (music) music.setDuck(1); const d = dialog.done; dialog = null; $('#dialog').hidden = true; d && d(); } else showLine(); }
 $('#dialog').addEventListener('click', () => dialog && advance());
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 3400); }
@@ -484,6 +485,16 @@ function startGig(g) {
   gigs = gigs.filter(x => x !== g); closePanel(); startMission(g, 'gig');
 }
 // wipe the save (after a confirm) and reload from the motel
+// the phone rings: answer to hear the caller (the tap also lets phones play voices), or decline and call back later
+let ringT = null, rangFor = null;
+function incomingCall(n) {
+  clearInterval(ringT); sfx('phone'); ringT = setInterval(() => sfx('phone'), 2200);
+  const stop = () => { clearInterval(ringT); ringT = null; };
+  panelCard('Incoming call', `📞 ${n.who}`, `<p class="muted">${esc(n.title)}</p>`, [
+    ['Answer', () => { stop(); closePanel(); initAudio(); talk(n.intro, () => startMission(n, 'story'), { phone: true }); }],
+    ['Decline', () => { stop(); closePanel(); toast('Call back any time from your PHONE.'); }, { plain: true }]]);
+  panel.dataset.locked = 'true';
+}
 function confirmNewGame() {
   panelCard('New game', 'Start over?', '<p>This erases your money, story progress, studio, talent and films. It can\'t be undone.</p>',
     [['Yes, start over', () => { removeEventListener('beforeunload', persist); try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); }], ['Cancel', () => { closePanel(); openPhone(); }, { plain: true }]]);
@@ -497,7 +508,7 @@ function openPhone() {
   const n = nextStory(), st = step();
   const story = STORY.map((m, i) => `<div class="${i < save.story ? 'done' : i === save.story ? 'now' : ''}"><span>${i + 1}. ${esc(m.title)}</span><span>${i < save.story ? 'Done' : i === save.story ? (act && act.kind === 'story' ? 'In progress' : esc(m.giver === 'phone' ? 'Phone' : m.who)) : 'Locked'}</span></div>`).join('');
   panelCard(`Day ${save.day} · ${fmt(save.cash)} · Respect ${save.rep} · Street ${save.street}`, 'MVP Phone', `<div class="list">${story}</div><p class="muted">${st ? 'Now: ' + esc(st.text) : n ? `Next: ${esc(n.title)}, ${n.giver === 'phone' ? 'answer the call below' : 'find ' + esc(n.who) + ' (gold beacon)'}` : 'Story complete. Keep shooting, keep producing.'}</p>`, [
-    ...(n && n.giver === 'phone' && !act ? [['Answer: ' + n.who, () => { closePanel(); sfx('phone'); talk(n.intro, () => startMission(n, 'story')); }]] : []),
+    ...(n && n.giver === 'phone' && !act ? [['Call back: ' + n.who, () => { closePanel(); sfx('phone'); talk(n.intro, () => startMission(n, 'story'), { phone: true }); }]] : []),
     ['Photo gigs', openGigs, { plain: true, small: act ? 'Finish your current job first' : '', disabled: !!act }],
     ['Talent roster', openRoster, { plain: true }],
     ['Catalog', openCatalog, { plain: true, small: save.releases.length ? `${save.releases.length} films · ${fmt(dailyRoyalty())}/day` : 'No releases yet' }],
@@ -708,7 +719,8 @@ function update(dt) {
   T += dt;
   save.minute += dt * 2; if (save.minute >= 1440) { save.minute -= 1440; save.day++; const roy = dailyRoyalty(); if (roy) { save.cash += roy; toast(`Royalties: your films earned ${fmt(roy)} today${bootleg() ? ' (after the bootleggers\' cut)' : ''}`); sfx('cash'); refreshHud(); } }
   const h = Math.floor(save.minute / 60), mi = Math.floor(save.minute % 60); $('#clock').textContent = `DAY ${save.day} · ${((h + 11) % 12) + 1}:${String(mi).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
-  if (!save.introDone && T > 1.5 && !dialog && panel.hidden) { save.introDone = true; persist(); const n = nextStory(); if (n && n.giver === 'phone' && !act) { sfx('phone'); talk(n.intro, () => startMission(n, 'story')); } }
+  { const n = nextStory(); // story calls ring by themselves (once per session; decline and call back from the PHONE)
+    if (!DEMO && T > 1.5 && n && n.giver === 'phone' && !act && !dialog && panel.hidden && rangFor !== n.id) { rangFor = n.id; save.introDone = true; persist(); incomingCall(n); } }
   const blocked = !!dialog || !panel.hidden;
   let f = stick.f, r = stick.r;
   if (!blocked) { if (keys.has('KeyW') || keys.has('ArrowUp')) f += 1; if (keys.has('KeyS') || keys.has('ArrowDown')) f -= 1; if (keys.has('KeyD') || keys.has('ArrowRight')) r += 1; if (keys.has('KeyA') || keys.has('ArrowLeft')) r -= 1; } else { f = r = 0; }
@@ -857,7 +869,7 @@ function beginDemo(reset) {
     car.x = D.myCarSpot.x; car.z = D.myCarSpot.z; car.a = D.myCarSpot.a; car.v = 0;
     $('#strip').replaceChildren(); persist(); }
   demoStarted = true; closePanel(); clearInput(); refreshHud();
-  if (save.story === 0 && !act) { save.introDone = true; talk(STORY[0].intro, () => startMission(STORY[0], 'story')); }
+  if (save.story === 0 && !act) { save.introDone = true; talk(STORY[0].intro, () => startMission(STORY[0], 'story'), { phone: true }); }
 }
 function demoComplete() {
   panelCard('VELVET HOURS · ASSIGNMENT COMPLETE', 'Your name is on the marquee.',
@@ -884,4 +896,4 @@ try { const stored = localStorage.getItem('mvp_graphics_quality'); if (['perform
 applyQuality(preferredQuality);
 refreshHud(); if (charsReady) $('#loading').hidden = true; if (DEMO) { demoStarted = true; update(0); demoTitle(); } frame();
 addEventListener('beforeunload', persist);
-window.__world = { SC, traffic, set debugCam(v) { debugCam = v; }, probe() { const r = renderer, out = {}; r.info.autoReset = false; const count = (k, f) => { r.info.reset(); f(); out[k] = r.info.render.calls; }; count('main', () => r.render(world, camera)); count('reflect', () => wet.render(renderer, world, camera)); const by = {}; world.traverse(o => { if (o.isMesh || o.isSprite || o.isPoints) { let p = o; while (p.parent && p.parent !== world) p = p.parent; const k = (p.name || p.type) + ':' + (o.isSprite ? 'sprite' : o.isInstancedMesh ? 'inst' : 'mesh'); by[k] = (by[k] || 0) + (Array.isArray(o.material) ? o.material.length : 1); } }); out.by = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 14); r.info.autoReset = true; return out; }, renderFrame() { if (where === 'world') wet.render(renderer, world, camera); composer.render(); }, P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update, tick(dt) { update(dt); pressed.clear(); }, persist, get mvp() { return mvp; }, get paused() { return paused; }, get driving() { return driving; } };
+window.__world = { SC, traffic, set debugCam(v) { debugCam = v; }, probe() { const r = renderer, out = {}; r.info.autoReset = false; const count = (k, f) => { r.info.reset(); f(); out[k] = r.info.render.calls; }; count('main', () => r.render(world, camera)); count('reflect', () => wet.render(renderer, world, camera)); const by = {}; world.traverse(o => { if (o.isMesh || o.isSprite || o.isPoints) { let p = o; while (p.parent && p.parent !== world) p = p.parent; const k = (p.name || p.type) + ':' + (o.isSprite ? 'sprite' : o.isInstancedMesh ? 'inst' : 'mesh'); by[k] = (by[k] || 0) + (Array.isArray(o.material) ? o.material.length : 1); } }); out.by = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 14); r.info.autoReset = true; return out; }, renderFrame() { if (where === 'world') wet.render(renderer, world, camera); composer.render(); }, P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update, voices, tick(dt) { update(dt); pressed.clear(); }, persist, get mvp() { return mvp; }, get paused() { return paused; }, get driving() { return driving; } };
