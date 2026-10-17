@@ -15,7 +15,9 @@ import * as C from '../hd-demo/lib/characters.js';
 import { buildStudio } from '../hd-demo/lib/studio.js';
 import { SpringSystem } from '../hd-demo/lib/springs.js';
 import { loadCharacter } from '../hd-demo/lib/glbchar.js';
+import { loadMocap, MocapDriver } from '../hd-demo/lib/mocap.js';
 import { Music, Voices } from './lib/audio.js';
+import { Mannerisms } from './lib/mannerisms.js';
 import { buildDistrict } from './lib/district.js?v=block-3';
 import { Traffic, Pedestrians, carModel } from './lib/npcs.js';
 import { buildClub } from './lib/club.js?v=block-3';
@@ -153,12 +155,17 @@ function adoptRig(old, next) {
   const parent = old.root.parent; if (parent) { parent.add(next.root); parent.remove(old.root); }
   springs.scan(next.modelRoot);
 }
-loadCharacter('../assets/characters/ruby.glb', { name: 'Ruby', height: 1.68, armPitch: -0.22 }).then(rig => {
-  if (!rig) return; const n = NPCS.ruby; adoptRig(n.rig, rig); noReflect(rig.root); n.rig = rig;
-}).catch(e => console.warn('Ruby model unavailable, using the code-built Ruby', e));
-loadCharacter('../assets/characters/mvp.glb', { name: 'MVP', height: 1.85 }).then(rig => {
+// recorded motion capture (idle / walk / run ...) for the model characters
+const mocapLib = loadMocap('../assets/animations/mocap.glb').catch(e => { console.warn('Motion capture unavailable', e); return null; });
+loadCharacter('../assets/characters/ruby.glb', { name: 'Ruby', height: 1.68, armPitch: -0.22 }).then(async rig => {
   if (!rig) return;
-  rig.prop = C.makeDSLR(); rig.propMode = 'both'; rig.hold = false; rig.root.add(rig.prop); // natural arm swing when walking; camera raised when standing
+  const lib = await mocapLib; if (lib) rig.mocap = new MocapDriver(rig, lib); // before anything moves the bones const n = NPCS.ruby; adoptRig(n.rig, rig); noReflect(rig.root); n.rig = rig;
+}).catch(e => console.warn('Ruby model unavailable, using the code-built Ruby', e));
+loadCharacter('../assets/characters/mvp.glb', { name: 'MVP', height: 1.85 }).then(async rig => {
+  if (!rig) return;
+  const lib = await mocapLib; if (lib) rig.mocap = new MocapDriver(rig, lib);
+  rig.prop = C.makeDSLR(); rig.propMode = 'both'; rig.hold = false; rig.root.add(rig.prop); // camera hangs on a neck strap; raised only to shoot
+  rig.strap = [0, 1].map(() => { const g = new THREE.CylinderGeometry(0.007, 0.007, 1, 6); g.translate(0, 0.5, 0); const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x141214, roughness: 0.7 })); rig.root.add(m); return m; });
   adoptRig(mvp, rig); for (const k of Object.keys(mvp)) delete mvp[k]; Object.assign(mvp, rig); // same object: every mvp.* reference keeps working
 }).catch(e => console.warn('MVP model unavailable, using the code-built MVP', e));
 let freeModel = null; // freelance model for gigs
@@ -222,6 +229,7 @@ function updateNPCs(dt, t) {
     else if (pl.pose === 'guard') C.setPose(n.rig, { shL: [-0.3, 0, -0.35], elL: [-1.3, 0, 0], shR: [-0.3, 0, 0.35], elR: [-1.3, 0, 0], hpL: [0, 0, 0.1], hpR: [0, 0, -0.1] }, Math.min(1, dt * 4));
     else C.setPose(n.rig, { sp: [0.01, Math.sin(t * 0.5 + n.poseT) * 0.12, 0], hd: [0, Math.sin(t * 0.4 + n.poseT) * 0.35, 0], shL: [0, 0, 0.55], elL: [-0.4, 0, -1.6], hpR: [-0.08, 0, 0], knR: [0.18, 0, 0] }, Math.min(1, dt * 3));
     if (n.rig.apply) n.rig.apply(); // model rigs: copy this frame's pose onto the bones
+    if (n.rig.mocap) { n.rig.mocap.play('idle'); n.rig.mocap.update(dt, pl.pose === 'idle' ? 0 : 1); } // recorded idle; dances and poses stay hand-made
   }
 }
 
@@ -315,6 +323,7 @@ function scoreShot(n) {
 }
 const grade = n => n >= 88 ? 'A+' : n >= 78 ? 'A' : n >= 66 ? 'B' : n >= 52 ? 'C' : 'D';
 function photo() {
+  if (mvp.retarget && !driving) mvp.shootT = 0.9; // raise the camera to his eye for the shot
   composer.render(); const url = canvas.toDataURL('image/jpeg', 0.88);
   const f = $('#flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); sfx('shutter');
   const img = document.createElement('img'); img.src = url; img.alt = 'Photo'; $('#strip').prepend(img); while ($('#strip').children.length > 8) $('#strip').lastChild.remove();
@@ -580,6 +589,28 @@ function drawMap(target) {
   mctx.save(); mctx.translate(s / 2, s / 2); mctx.rotate(-(driving ? car.a : P.ry)); mctx.fillStyle = '#fff'; mctx.beginPath(); mctx.moveTo(0, 8); mctx.lineTo(-5, -4); mctx.lineTo(5, -4); mctx.fill(); mctx.restore();
 }
 
+// ---------- MVP's camera: on a neck strap, raised to the eye only to shoot
+const manner = new Mannerisms();
+const _cv = new THREE.Vector3(), _cv2 = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+function placeMvpCamera() {
+  const r = mvp, b = r.bones; if (!r.prop || !b) return;
+  r.root.updateMatrixWorld(true);
+  const fwd = new THREE.Vector3(Math.sin(P.ry), 0, Math.cos(P.ry)), right = new THREE.Vector3(Math.cos(P.ry), 0, -Math.sin(P.ry));
+  const chest = (b.Spine2 || b.Spine1 || b.Spine).getWorldPosition(new THREE.Vector3());
+  const hang = chest.clone().addScaledVector(fwd, 0.15).addScaledVector(_up, -0.06 + Math.sin(T * 9) * 0.006 * Math.min(1, P.move * 2));
+  r.handL.getWorldPosition(_cv); r.handR.getWorldPosition(_cv2); const hands = _cv.add(_cv2).multiplyScalar(0.5).addScaledVector(fwd, 0.03);
+  const pos = hang.lerp(hands, r.aim || 0);
+  r.prop.position.copy(r.root.worldToLocal(pos.clone()));
+  r.prop.rotation.set(-0.25 * (1 - (r.aim || 0)), 0, 0); // hangs tilted slightly down against the chest
+  // strap: from either side of the neck down to the camera body
+  const neck = (b.Neck || b.Head).getWorldPosition(new THREE.Vector3()).addScaledVector(fwd, -0.01);
+  r.strap.forEach((m, i) => {
+    const a = neck.clone().addScaledVector(right, i ? 0.065 : -0.065), c = pos.clone().addScaledVector(right, i ? 0.06 : -0.06).addScaledVector(_up, 0.03);
+    const la = r.root.worldToLocal(a.clone()), lc = r.root.worldToLocal(c.clone()), d = lc.clone().sub(la);
+    m.position.copy(la); m.scale.set(1, d.length(), 1); m.quaternion.setFromUnitVectors(_up, d.normalize());
+  });
+}
+
 // ---------- main update
 const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 60, 20, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.5, 0.25, 0.3), transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
 beacon.geometry.translate(0, 30, 0); world.add(beacon);
@@ -608,10 +639,25 @@ function update(dt) {
     if (engine) engine.g.gain.value = 0;
     const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), run = keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(stick.f, stick.r) > 0.92;
     moveChar(P, fx * f - fz * r, fz * f + fx * r, run ? 5.6 : 2.3, dt, mvp);
-    if (P.move <= 0.05) C.setPose(mvp, Object.assign({ sp: [0.02 + Math.sin(T * 1.6) * 0.015, 0, 0] }, C.HOLD), Math.min(1, dt * 8));
-    if (mvp.retarget) mvp.propMode = P.move > 0.05 ? 'R' : 'both'; // walking: camera carried in the right hand; standing: held up in both
-    if (mvp.apply) mvp.apply(); // model rig: copy the pose onto the bones before the camera finds the hands
-    C.updProps(mvp);
+    if (mvp.retarget) { // model MVP: idle mannerisms, camera to the eye only to shoot (or while framing a shot)
+      const s0 = step(), framing = s0 && s0.t === 'shoot' && s0.scene === where && P.move <= 0.05;
+      mvp.shootT = Math.max(0, (mvp.shootT || 0) - dt);
+      const aimTo = mvp.shootT > 0 || framing ? 1 : 0; mvp.aim = (mvp.aim || 0) + (aimTo - (mvp.aim || 0)) * Math.min(1, dt * 9);
+      if (aimTo) C.setPose(mvp, C.MVP_SHOOT, Math.min(1, dt * 10));
+      else if (P.move <= 0.05) C.setPose(mvp, manner.pose(dt, T), Math.min(1, dt * 3.5));
+      if (P.move > 0.05 || aimTo) manner.reset();
+      mvp.apply();
+      if (mvp.mocap) { // recorded walk / run / idle; hand-made mannerisms and the camera raise blend over the top
+        const moving = P.move > 0.05;
+        mvp.mocap.play(moving ? (run ? 'run' : 'walk') : 'idle', 0.25, moving ? (run ? 1.2 : 1.35) : 1);
+        const procTo = aimTo || manner.move ? 1 : 0; mvp.procW = (mvp.procW || 0) + (procTo - (mvp.procW || 0)) * Math.min(1, dt * 6);
+        mvp.mocap.update(dt, mvp.procW < 0.02 ? 0 : mvp.procW);
+      }
+      placeMvpCamera();
+    } else {
+      if (P.move <= 0.05) C.setPose(mvp, Object.assign({ sp: [0.02 + Math.sin(T * 1.6) * 0.015, 0, 0] }, C.HOLD), Math.min(1, dt * 8));
+      C.updProps(mvp);
+    }
   }
   updateNPCs(dt, T);
   if (music) { const s0 = step(); music.setMood(where === 'club' ? 'club' : where === 'studio' ? 'studio' : s0 && s0.t === 'chase' ? 'chase' : 'street'); }
@@ -725,4 +771,4 @@ try { const stored = localStorage.getItem('mvp_graphics_quality'); if (['perform
 applyQuality(preferredQuality);
 refreshHud(); $('#loading').hidden = true; if (DEMO) { demoStarted = true; update(0); demoTitle(); } frame();
 addEventListener('beforeunload', persist);
-window.__world = { SC, traffic, set debugCam(v) { debugCam = v; }, probe() { const r = renderer, out = {}; r.info.autoReset = false; const count = (k, f) => { r.info.reset(); f(); out[k] = r.info.render.calls; }; count('main', () => r.render(world, camera)); count('reflect', () => wet.render(renderer, world, camera)); const by = {}; world.traverse(o => { if (o.isMesh || o.isSprite || o.isPoints) { let p = o; while (p.parent && p.parent !== world) p = p.parent; const k = (p.name || p.type) + ':' + (o.isSprite ? 'sprite' : o.isInstancedMesh ? 'inst' : 'mesh'); by[k] = (by[k] || 0) + (Array.isArray(o.material) ? o.material.length : 1); } }); out.by = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 14); r.info.autoReset = true; return out; }, renderFrame() { if (where === 'world') wet.render(renderer, world, camera); composer.render(); }, P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update };
+window.__world = { SC, traffic, set debugCam(v) { debugCam = v; }, probe() { const r = renderer, out = {}; r.info.autoReset = false; const count = (k, f) => { r.info.reset(); f(); out[k] = r.info.render.calls; }; count('main', () => r.render(world, camera)); count('reflect', () => wet.render(renderer, world, camera)); const by = {}; world.traverse(o => { if (o.isMesh || o.isSprite || o.isPoints) { let p = o; while (p.parent && p.parent !== world) p = p.parent; const k = (p.name || p.type) + ':' + (o.isSprite ? 'sprite' : o.isInstancedMesh ? 'inst' : 'mesh'); by[k] = (by[k] || 0) + (Array.isArray(o.material) ? o.material.length : 1); } }); out.by = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 14); r.info.autoReset = true; return out; }, renderFrame() { if (where === 'world') wet.render(renderer, world, camera); composer.render(); }, P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update, get mvp() { return mvp; } };

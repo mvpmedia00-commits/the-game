@@ -44,6 +44,7 @@ export async function loadCharacter(url, opts = {}) {
   rig.root = root; rig.modelRoot = model;
   const bones = {}; model.traverse(o => { if (o.isBone) bones[o.name.replace(/^mixamorig\d*[:_]?/i, '')] = o; });
   rig.handL = bones.LeftHand; rig.handR = bones.RightHand; rig.headBone = bones.Head;
+  rig.bones = bones;
   rig.springs = []; // spring bones are found by name with SpringSystem.scan(rig.modelRoot)
   return rig;
 }
