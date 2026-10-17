@@ -385,6 +385,11 @@ The world game still uses the code-built characters; swapping the real models in
   - Zooming in switches to MVP's viewfinder, aimed at the subject.
   - Cropping her feet halves the fill score.
 - **Saves:** indoors, the save stores the street spot outside that building's door.
+- **Intro video:** `assets/intro.js` plays `assets/video/intro.mp4`, or `intro.webm` where H.264 isn't supported.
+  - It plays fullscreen after the 18+ screen, with sound when the player has just tapped through it; otherwise it starts muted with a "Tap for sound" button.
+  - Any key, a tap or SKIP ends it.
+  - `world/index.html` imports the game only once `window.mvpIntroDone` resolves, so the city build doesn't make the video stutter.
+  - To change the video, replace both files (square or 16:9 both work, letterboxed on black).
 - **Age gate:** `assets/agegate.js` asks once per device (`mvp_age_ok`). The game waits for `window.mvpAgeOk`.
 
 ## 12f. Choices, meters, loyalty, endings

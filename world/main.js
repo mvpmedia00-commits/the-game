@@ -693,7 +693,7 @@ beacon.geometry.translate(0, 30, 0); world.add(beacon);
 const v3 = new THREE.Vector3(), lookAt = new THREE.Vector3(); let snapCam = true, shake = 0, T = 0;
 let debugCam = null, doorLock = 0;
 function update(dt) {
-  if (!window.mvpAgeOk) return; // 18+ gate (assets/agegate.js) still up
+  if (!window.mvpAgeOk || window.mvpIntroPlaying) return; // 18+ gate (assets/agegate.js) or the intro video (assets/intro.js) still up
   if (DEMO && !demoStarted) return;
   if (DEMO && !panel.hidden) { if ((pressed.has('Escape') || pressed.has('Tab')) && panel.dataset.dismissible === 'true') closePanel(); return; }
   if (paused) { if (pressed.has('Escape') && performance.now() - pausedAt > 300) { closePanel(); pressed.delete('Escape'); } return; }
