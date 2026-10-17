@@ -385,7 +385,10 @@ The world game still uses the code-built characters; swapping the real models in
   - Zooming in switches to MVP's viewfinder, aimed at the subject.
   - Cropping her feet halves the fill score.
 - **Saves:** indoors, the save stores the street spot outside that building's door.
-- **Intro video:** `assets/intro.js` plays `assets/video/intro.mp4`, or `intro.webm` where H.264 isn't supported.
+- **Editions:** `assets/editions.js` (loaded first) picks the edition. It defaults to `xrated` (The Underground Cut · X-Rated, 18+); `?edition=pg13` switches.
+  - Each edition has its own intro video and its own age-gate setting. PG-13 has no gate, and its intro goes in `assets/video/intro-pg13.mp4` / `.webm` once it exists.
+  - The edition label shows on the loading screen, the 18+ screen and the pause screen.
+- **Intro video:** `assets/intro.js` plays the edition's video (`assets/video/intro-xrated.mp4`, or the `.webm` copy where H.264 isn't supported).
   - It plays fullscreen after the 18+ screen, with sound when the player has just tapped through it; otherwise it starts muted with a "Tap for sound" button.
   - Any key, a tap or SKIP ends it.
   - `world/index.html` imports the game only once `window.mvpIntroDone` resolves, so the city build doesn't make the video stutter.

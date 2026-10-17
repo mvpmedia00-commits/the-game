@@ -1,9 +1,11 @@
-// Intro video while the game loads. Plain script: load it after agegate.js with data-src="<path to intro.mp4>".
+// Intro video while the game loads. Plain script: load it after editions.js and agegate.js with data-base="<assets folder>/";
+// it plays the edition's intro (assets/video/intro-xrated.mp4 or intro-pg13.mp4). A missing video is simply skipped.
 // Plays once per page load and covers the loading screen. Skip with any key, a tap or the Skip button.
 // The game waits while window.mvpIntroPlaying is true, and world/index.html only starts building the city once
 // window.mvpIntroDone resolves (the modules download in the background meanwhile).
 (function () {
-  var me = document.currentScript, src = me && me.getAttribute('data-src');
+  var me = document.currentScript, base = me && me.getAttribute('data-base'), ED = window.MVP_EDITION;
+  var src = base && ED && ED.intro ? base + ED.intro : me && me.getAttribute('data-src'); // this edition's intro (X-rated or PG-13)
   if (!src) return;
   var resolveDone; window.mvpIntroDone = new Promise(function (r) { resolveDone = r; }); // the page starts the game when this resolves
   window.mvpIntroPlaying = true;

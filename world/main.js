@@ -439,7 +439,7 @@ function closePanel() { panel.hidden = true; panel.innerHTML = ''; panelActs = [
 let paused = false, pausedAt = 0;
 function pauseGame() {
   if (paused || !panel.hidden || dialog || (DEMO && !demoStarted)) return;
-  panelCard('Paused', 'Game paused', '<p class="muted">Missions, timers and traffic are frozen.</p>', [['Resume', closePanel], ['Phone menu', () => { closePanel(); openPhone(); }, { plain: true }]]);
+  panelCard('Paused', 'Game paused', `<p class="muted">Missions, timers and traffic are frozen.</p><p class="muted">${esc((window.MVP_EDITION && window.MVP_EDITION.label) || '')}</p>`, [['Resume', closePanel], ['Phone menu', () => { closePanel(); openPhone(); }, { plain: true }]]);
   panel.dataset.dismissible = 'true'; paused = true; pausedAt = performance.now();
 }
 $('#pausebtn').addEventListener('click', pauseGame);
