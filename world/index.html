@@ -103,8 +103,9 @@ body.touch #carbtn { display: block; } body.touch.driving #brakebtn { display: b
   "three/addons/": "../vendor/three/examples/jsm/"
 } }
 </script>
+<script src="../assets/editions.js"></script>
 <script src="../assets/agegate.js"></script>
-<script src="../assets/intro.js" data-src="../assets/video/intro.mp4"></script>
+<script src="../assets/intro.js" data-base="../assets/"></script>
 </head>
 <body>
 <canvas id="view" aria-label="Las Vegas street, third-person view"></canvas>
@@ -131,6 +132,7 @@ body.touch #carbtn { display: block; } body.touch.driving #brakebtn { display: b
 <button id="quality" aria-label="Cycle graphics quality: performance, balanced, cinematic">BALANCED</button>
 <div id="demo-guide" hidden role="status"></div>
 <div id="loading">MVP MEDIA · LAS VEGAS — THE UNDERGROUND CUT</div>
+<script>document.getElementById('loading').textContent = 'MVP MEDIA · LAS VEGAS — ' + ((window.MVP_EDITION && window.MVP_EDITION.label) || 'The Underground Cut').toUpperCase();</script>
 <link rel="modulepreload" href="./main.js?v=velvet-block-3">
 <script type="module">
 // build the city after the intro video, so the video plays smoothly (the modules are already downloading)
