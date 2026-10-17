@@ -99,7 +99,7 @@ frame()
 - Traffic cars are moving obstacles: you can't walk through them, and ramming one stops it for 1.5 seconds.
 
 ### Controls
-- **Keyboard/mouse:** WASD/arrows, Shift, E, F, Space, P, Tab/M. Clicking the screen locks the mouse for camera look.
+- **Keyboard/mouse:** WASD/arrows, Shift, E, F, Space, P, Z/X or wheel (zoom while shooting), Tab/M, Esc (pause). Clicking the screen locks the mouse for camera look. F always gets in the car when it's in reach, even if a door or person is closer.
 - **Touch:** touching the left 45% of the screen spawns a joystick under your thumb; the right side drags the camera. Buttons: ACT, CAR, BRAKE, SHOOT, PHONE. Detected with `matchMedia('(pointer: coarse)')`.
 
 ### Sound
@@ -285,7 +285,7 @@ It shows next to your rep in the HUD, and a "Promoted" line appears on the missi
    - +7 for each performer whose favorite lighting you chose, +7 for each whose favorite mood you chose,
    - + camera (dolly 5, handheld 3, locked-off 1),
    - then × crew multiplier (Lean 0.9, Standard 1.1, Premium 1.35), clamped to 10–100.
-4. **Opening sales** = `quality × (25 + rep) × 2.2`. **Royalties** = 8% of that, every in-game day.
+4. **Opening sales** = `quality × (25 + rep) × 0.72`. **Royalties** = 5% of that, every in-game day.
 5. The wrap message depends on quality (75+ "The scene works", 50+ "Solid, sellable", below that "opens soft and dies at the box office").
 
 One production per in-game day (except the story's first feature).
@@ -376,9 +376,20 @@ The world game still uses the code-built characters; swapping the real models in
   - Dialogue is spoken with the browser's voices, a different one per character, and the music ducks under it.
   - Toggles for both are in the phone menu.
 
+## 12e. Offline, pause, framing, age gate
+
+- **Offline:** three.js r160 (`vendor/three/`, only the files the game uses) and the fonts (`vendor/fonts/`) ship with the game. Nothing loads from the internet, which Steam needs.
+- **Pause:** Esc, the II button, releasing the mouse lock or switching tabs. Everything stops, timers included. The phone does *not* stop mission timers.
+- **Framing coach** (during a shoot):
+  - A circle follows the subject's face and turns green when the shot would grade A. A tip says what to fix: zoom, line up a gold point, keep her feet in, wait for the pose.
+  - Zooming in switches to MVP's viewfinder, aimed at the subject.
+  - Cropping her feet halves the fill score.
+- **Saves:** indoors, the save stores the street spot outside that building's door.
+- **Age gate:** `assets/agegate.js` asks once per device (`mvp_age_ok`). The game waits for `window.mvpAgeOk`.
+
 ## 13. Testing and debugging
 
-- `window.__world` in the browser console exposes the game state: `__world.save` (edit cash, story, etc.), `__world.startMission(__world.STORY[3], 'story')`, `__world.enter('club')`, `__world.update(0.033)` to step one frame.
+- `window.__world` in the browser console exposes the game state: `__world.save` (edit cash, story, etc.), `__world.startMission(__world.STORY[3], 'story')`, `__world.enter('club')`, `__world.update(0.033)` to step one frame (`__world.tick(dt)` also clears key presses, for scripted tests).
 - Automated checks have been run in headless Chromium (Playwright): mission 1 end to end, driving, a full chase, buying the studio, producing a film, the rung HUD and the Catalog.
 - `__world.debugCam = { pos: [x, y, z], look: [x, y, z] }` freezes the camera for screenshots (`null` to release). `__world.probe()` reports draw calls for the main and reflection passes.
 - `node tests/demo-flow.cjs` checks the demo mission flow. `tools/check-graphics.cjs` builds the whole city, strip, reflections and sky in Node to catch broken geometry (see GRAPHICS.md for how to run it).

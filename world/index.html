@@ -5,9 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Velvet Hours · MVP Media: Las Vegas</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;900&family=Montserrat:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../vendor/fonts/fonts.css">
 <style>
 /* Layout: full-bleed WebGL world; HUD pinned to corners (zone + clock top-left, minimap top-right, objective top-centre, prompt + dialog bottom). Single dark neon look by design. */
 :root { --ink: #09060a; --glass: rgba(12,7,10,.7); --line: rgba(243,233,228,.16); --red: #e0202e; --red-hot: #ff3b48; --gold: #e8b64c; --bone: #f3e9e4; --dim: #b8a3a0;
@@ -54,6 +52,14 @@ body.touch #strip { bottom: calc(190px + env(safe-area-inset-bottom, 0px)); }
 #grid { position: fixed; inset: 0; pointer-events: none; background:
   linear-gradient(90deg, transparent calc(33.33% - .5px), rgba(255,255,255,.22) calc(33.33% - .5px), rgba(255,255,255,.22) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.22) calc(66.66% - .5px), rgba(255,255,255,.22) calc(66.66% + .5px), transparent calc(66.66% + .5px)),
   linear-gradient(0deg, transparent calc(33.33% - .5px), rgba(255,255,255,.22) calc(33.33% - .5px), rgba(255,255,255,.22) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.22) calc(66.66% - .5px), rgba(255,255,255,.22) calc(66.66% + .5px), transparent calc(66.66% + .5px)); }
+#frame-dot { position: fixed; width: 34px; height: 34px; margin: -17px 0 0 -17px; border: 2px solid rgba(255,255,255,.75); border-radius: 50%; pointer-events: none; transition: border-color .15s, transform .15s; z-index: 2; }
+#frame-dot.ok { border-color: #5dff9a; transform: scale(1.15); box-shadow: 0 0 14px rgba(93,255,154,.6); }
+.frame-pt { position: fixed; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--gold, #e6bd79); opacity: .8; pointer-events: none; }
+#frame-tip { position: fixed; left: 50%; top: calc(88px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); background: var(--glass); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-weight: 600; font-size: 13px; white-space: nowrap; pointer-events: none; }
+#frame-tip.ok { color: #5dff9a; }
+#zoombtns { position: fixed; right: max(20px, env(safe-area-inset-right, 0px)); bottom: calc(140px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 8px; pointer-events: auto; }
+#zoombtns button { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: var(--glass); color: var(--bone); font: 700 20px var(--body); cursor: pointer; }
+#pausebtn { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(134px + env(safe-area-inset-top, 0px)); border: 1px solid var(--line); background: var(--glass); color: var(--bone); border-radius: 10px; padding: 8px 12px; font: 700 11px var(--body); letter-spacing: .16em; cursor: pointer; }
 #grid::after { content: "● REC"; position: absolute; left: 50%; top: calc(64px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); color: var(--red-hot); font-weight: 700; letter-spacing: .2em; font-size: 12px; }
 .rbtn { position: fixed; display: none; border-radius: 50%; border: 1.5px solid var(--red-hot); background: rgba(16,6,8,.55); color: var(--bone); font: 700 11px var(--body); letter-spacing: .12em; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 #carbtn { width: 58px; height: 58px; right: calc(186px + env(safe-area-inset-right, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
@@ -92,24 +98,26 @@ body.touch #carbtn { display: block; } body.touch.driving #brakebtn { display: b
 </style>
 <script type="importmap">
 { "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  "three": "../vendor/three/build/three.module.min.js",
+  "three/addons/": "../vendor/three/examples/jsm/"
 } }
 </script>
+<script src="../assets/agegate.js"></script>
 </head>
 <body>
 <canvas id="view" aria-label="Las Vegas street, third-person view"></canvas>
 <div id="loc" class="hud"><div id="zone">Las Vegas</div><div id="clock">11:42 PM</div><div id="money"><b>$250</b><i>REP 0</i></div></div>
 <button id="phonebtn" aria-label="Open phone menu">PHONE</button>
+<button id="pausebtn" aria-label="Pause the game">II PAUSE</button>
 <div id="objbox" class="hud"><small>Objective</small><div id="objective"></div><div id="timer" hidden></div></div>
 <div id="hpbar" class="hud" hidden><span id="hpname">Target</span><div><i id="hpfill"></i></div></div>
 <div id="speedo" class="hud" hidden>0<small>MPH</small></div>
-<div id="grid" hidden></div>
+<div id="grid" hidden><i class="frame-pt" style="left:33.33%;top:33.33%"></i><i class="frame-pt" style="left:66.66%;top:33.33%"></i><i class="frame-pt" style="left:33.33%;top:66.66%"></i><i class="frame-pt" style="left:66.66%;top:66.66%"></i><b id="frame-dot" hidden></b><span id="frame-tip"></span><div id="zoombtns"><button id="zoomin" aria-label="Zoom in">+</button><button id="zoomout" aria-label="Zoom out">−</button></div></div>
 <canvas id="map" class="hud" aria-label="Minimap"></canvas>
 <div id="prompt" class="hud" hidden><kbd>E</kbd><span id="prompt-text"></span></div>
 <div id="dialog" hidden><div id="dlg-who"></div><p id="dlg-text"></p><small>E · Next</small></div>
 <div id="strip" class="hud" aria-label="Photos taken"></div>
-<div id="help" class="hud"><kbd>WASD</kbd> move · <kbd>Shift</kbd> run · <kbd>Mouse</kbd> look (click to lock)<br><kbd>E</kbd> talk / enter · <kbd>F</kbd> car · <kbd>Space</kbd> brake · <kbd>P</kbd> photo · <kbd>Tab</kbd> phone</div>
+<div id="help" class="hud"><kbd>WASD</kbd> move · <kbd>Shift</kbd> run · <kbd>Mouse</kbd> look (click to lock)<br><kbd>E</kbd> talk / enter · <kbd>F</kbd> car · <kbd>Space</kbd> brake · <kbd>P</kbd> photo · <kbd>Z</kbd>/<kbd>X</kbd> zoom · <kbd>Tab</kbd> phone · <kbd>Esc</kbd> pause</div>
 <div id="stick"><div id="knob"></div></div>
 <button id="act" aria-label="Interact">ACT</button>
 <button id="carbtn" class="rbtn" aria-label="Get in or out of the car">CAR</button>
