@@ -9,3 +9,5 @@ To add more moves:
 3. Merge it into this file with `gltf-transform merge`.
 
 The game plays any clip by name: `rig.mocap.play('clipName')`.
+
+`ruby-dance.glb`: Ruby's own clips from Tripo, `twerk` and `nod`, as animation only (no mesh). It's played with a separate MocapDriver on Ruby, because its skeleton differs from the Xbot clips in `mocap.glb`.
