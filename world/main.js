@@ -178,18 +178,26 @@ function adoptRig(old, next) {
 }
 // recorded motion capture (idle / walk / run ...) for the model characters
 const mocapLib = loadMocap('../assets/animations/mocap.glb').catch(e => { console.warn('Motion capture unavailable', e); return null; });
+// While the real models load, the code-built stand-ins stay hidden (no flash of the blocky version).
+// If a model fails, or takes longer than 45 s (very slow connection), the stand-in is shown instead.
+const hideStandIn = r => r.root.children.forEach(c => { c.userData.standIn = c.visible; c.visible = false; });
+const showStandIn = r => r.root.children.forEach(c => { if ('standIn' in c.userData) c.visible = c.userData.standIn; });
+const standInRuby = NPCS.ruby.rig, standInMvp = mvp.root; hideStandIn(standInRuby); hideStandIn(mvp);
+// the loading screen stays up (and the story waits) until MVP himself is ready
+let charsReady = false; const markReady = () => { if (charsReady) return; charsReady = true; const l = document.getElementById('loading'); if (l) l.hidden = true; };
+setTimeout(() => { if (NPCS.ruby.rig === standInRuby) showStandIn(standInRuby); if (mvp.root === standInMvp) showStandIn(mvp); markReady(); }, 45000);
 loadCharacter('../assets/characters/ruby.glb', { name: 'Ruby', height: 1.68, armPitch: -0.22 }).then(async rig => {
-  if (!rig) return;
+  if (!rig) return showStandIn(standInRuby);
   const lib = await mocapLib; if (lib) rig.mocap = new MocapDriver(rig, lib); // before anything moves the bones
   const n = NPCS.ruby; adoptRig(n.rig, rig); noReflect(rig.root); n.rig = rig;
-}).catch(e => console.warn('Ruby model unavailable, using the code-built Ruby', e));
+}).catch(e => { console.warn('Ruby model unavailable, using the code-built Ruby', e); showStandIn(standInRuby); });
 loadCharacter('../assets/characters/mvp.glb', { name: 'MVP', height: 1.85 }).then(async rig => {
-  if (!rig) return;
+  if (!rig) { showStandIn(mvp); return markReady(); }
   const lib = await mocapLib; if (lib) rig.mocap = new MocapDriver(rig, lib);
   rig.prop = C.makeDSLR(); rig.propMode = 'both'; rig.hold = false; rig.root.add(rig.prop); // camera hangs on a neck strap; raised only to shoot
   rig.strap = [0, 1].map(() => { const g = new THREE.CylinderGeometry(0.007, 0.007, 1, 6); g.translate(0, 0.5, 0); const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x141214, roughness: 0.7 })); rig.root.add(m); return m; });
-  adoptRig(mvp, rig); for (const k of Object.keys(mvp)) delete mvp[k]; Object.assign(mvp, rig); // same object: every mvp.* reference keeps working
-}).catch(e => console.warn('MVP model unavailable, using the code-built MVP', e));
+  adoptRig(mvp, rig); for (const k of Object.keys(mvp)) delete mvp[k]; Object.assign(mvp, rig); markReady(); // same object: every mvp.* reference keeps working
+}).catch(e => { console.warn('MVP model unavailable, using the code-built MVP', e); if (mvp.root === standInMvp) showStandIn(mvp); markReady(); });
 let freeModel = null; // freelance model for gigs
 const P = { x: save.x ?? D.spawn.x, z: save.z ?? D.spawn.z, a: D.spawn.yaw, ry: D.spawn.yaw, walk: 0, move: 0 };
 if (!D.inBounds(P.x, P.z)) { P.x = D.spawn.x; P.z = D.spawn.z; }
@@ -693,7 +701,7 @@ beacon.geometry.translate(0, 30, 0); world.add(beacon);
 const v3 = new THREE.Vector3(), lookAt = new THREE.Vector3(); let snapCam = true, shake = 0, T = 0;
 let debugCam = null, doorLock = 0;
 function update(dt) {
-  if (!window.mvpAgeOk || window.mvpIntroPlaying) return; // 18+ gate (assets/agegate.js) or the intro video (assets/intro.js) still up
+  if (!window.mvpAgeOk || window.mvpIntroPlaying || !charsReady) return; // 18+ gate (assets/agegate.js) or the intro video (assets/intro.js) still up
   if (DEMO && !demoStarted) return;
   if (DEMO && !panel.hidden) { if ((pressed.has('Escape') || pressed.has('Tab')) && panel.dataset.dismissible === 'true') closePanel(); return; }
   if (paused) { if (pressed.has('Escape') && performance.now() - pausedAt > 300) { closePanel(); pressed.delete('Escape'); } return; }
@@ -874,6 +882,6 @@ function frame() { requestAnimationFrame(frame); const dt = Math.min(clock.getDe
 let preferredQuality = 'balanced';
 try { const stored = localStorage.getItem('mvp_graphics_quality'); if (['performance', 'balanced', 'cinematic'].includes(stored)) preferredQuality = stored; } catch (_) {}
 applyQuality(preferredQuality);
-refreshHud(); $('#loading').hidden = true; if (DEMO) { demoStarted = true; update(0); demoTitle(); } frame();
+refreshHud(); if (charsReady) $('#loading').hidden = true; if (DEMO) { demoStarted = true; update(0); demoTitle(); } frame();
 addEventListener('beforeunload', persist);
 window.__world = { SC, traffic, set debugCam(v) { debugCam = v; }, probe() { const r = renderer, out = {}; r.info.autoReset = false; const count = (k, f) => { r.info.reset(); f(); out[k] = r.info.render.calls; }; count('main', () => r.render(world, camera)); count('reflect', () => wet.render(renderer, world, camera)); const by = {}; world.traverse(o => { if (o.isMesh || o.isSprite || o.isPoints) { let p = o; while (p.parent && p.parent !== world) p = p.parent; const k = (p.name || p.type) + ':' + (o.isSprite ? 'sprite' : o.isInstancedMesh ? 'inst' : 'mesh'); by[k] = (by[k] || 0) + (Array.isArray(o.material) ? o.material.length : 1); } }); out.by = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 14); r.info.autoReset = true; return out; }, renderFrame() { if (where === 'world') wet.render(renderer, world, camera); composer.render(); }, P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update, tick(dt) { update(dt); pressed.clear(); }, persist, get mvp() { return mvp; }, get paused() { return paused; }, get driving() { return driving; } };
