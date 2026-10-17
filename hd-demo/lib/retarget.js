@@ -21,6 +21,7 @@ export function mixamoRig(root, opts = {}) {
   root.traverse(o => { if (o.isBone) bones[strip(o.name)] = o; });
   if (!ORDER.every(k => bones[MAP[k]])) return null;
   const B = Object.fromEntries(ORDER.map(k => [k, bones[MAP[k]]]));
+  const restLocal = new Map(); root.traverse(o => { if (o.isBone) restLocal.set(o, [o.quaternion.clone(), o.position.clone()]); }); // true rest pose, for later add-ons (mocap)
   root.updateMatrixWorld(true);
   // face +z like every other character (left arm on +x)
   const l = B.shL.getWorldPosition(new THREE.Vector3()), r = B.shR.getWorldPosition(new THREE.Vector3());
@@ -41,7 +42,7 @@ export function mixamoRig(root, opts = {}) {
   for (const k of ORDER) offset[k] = pw[k].clone().invert().multiply(relQ(B[k], root, new THREE.Quaternion()));
   // poses are absolute: start the proxies from the game's rest (arms down)
   for (const k of ORDER) proxy[k].rotation.set(0, 0, 0);
-  const rig = { root, cur: null, model: B, bobNode: new THREE.Object3D(), retarget: true };
+  const rig = { root, cur: null, model: B, bobNode: new THREE.Object3D(), retarget: true, restLocal };
   for (const k of ORDER) rig[k] = proxy[k];
   rig.armPitch = opts.armPitch || 0; // per-model correction: swing the arms forward (negative) or back at the shoulder
   rig.apply = () => {

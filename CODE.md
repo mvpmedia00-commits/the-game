@@ -358,6 +358,24 @@ The world game still uses the code-built characters; swapping the real models in
   - arms 10% shorter and 6% fuller;
   - spring bones added for her chest, afro and four tutu panels, so they bounce with the physics slider.
 
+## 12d. Motion capture, mannerisms, sound
+
+- **Motion capture** (`hd-demo/lib/mocap.js`, clips in `assets/animations/mocap.glb`):
+  - The clips are real Mixamo mocap: idle, walk, run, agree, headShake, sad_pose and sneak_pose. They come from the three.js example robot, with its mesh stripped out.
+  - `new MocapDriver(rig, lib)` plays a clip on an invisible copy of the source skeleton. Each frame it copies every bone's movement onto the character, relative to both rest poses.
+  - Each limb is lined up to the source rest pose first, so differences in leg spread or arm angle between models don't carry over.
+  - `update(dt, procW)` blends in the game's own poses: 0 = pure mocap, 1 = the game's pose on the main joints. Photo poses, dances and mannerisms use 1.
+  - To add a clip:
+    1. Download any Mixamo animation (FBX, "without skin").
+    2. Convert it to GLB with Blender.
+    3. Merge it into `mocap.glb`. Its name becomes the clip name for `play()`.
+- **Mannerisms** (`world/lib/mannerisms.js`): when MVP stands still he breathes and shifts his weight. Every few seconds he does a random move (looks around, checks his watch, fixes his beret, crosses his arms, hands on hips, rubs his hands, neck roll, nods to the beat).
+- **Camera strap**: MVP's DSLR hangs on a neck strap. It rises to his hands only while framing a shot or just after **P**.
+- **Sound** (`world/lib/audio.js`):
+  - Generated music, original and safe to stream: street, club, studio and chase moods.
+  - Dialogue is spoken with the browser's voices, a different one per character, and the music ducks under it.
+  - Toggles for both are in the phone menu.
+
 ## 13. Testing and debugging
 
 - `window.__world` in the browser console exposes the game state: `__world.save` (edit cash, story, etc.), `__world.startMission(__world.STORY[3], 'story')`, `__world.enter('club')`, `__world.update(0.033)` to step one frame.
