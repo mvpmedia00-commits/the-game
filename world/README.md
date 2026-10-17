@@ -15,9 +15,9 @@ Third-person HD district built on three r160 (no build step). Shares the charact
 ## Controls
 
 Desktop: WASD move/drive, Shift run, mouse look (click to lock), E talk/enter, F car, Space brake, P photo, Tab phone.
-Touch: left thumb joystick (push fully to run, or drive), right thumb look, ACT, CAR, BRAKE, SHOOT, PHONE.
+Touch: left thumb joystick (push fully to run, or drive), right thumb look, ACT, CAR, BRAKE, SHOOT, PHONE, II PAUSE, and + / − to zoom during a shoot.
 
-## Story (8 missions)
+## Story (10 missions, 3 endings)
 
 | # | Mission | Giver | What you do |
 |---|---|---|---|
@@ -28,7 +28,11 @@ Touch: left thumb joystick (push fully to run, or drive), right thumb look, ACT,
 | 5 | Keys to the Kingdom | Landlord, Room 12 | Buy MVP Studios ($3,500) |
 | 6 | First Feature | Jade, outside the studio | Produce your first film on Stage A |
 | 7 | Bootleg Boulevard | Coco, Scarlet Lounge | Stop the bootleg van on Fremont |
-| 8 | Beyond the Frame | Ruby, outside the studio | Premiere red carpet (6 photos), then stop Silas Crane |
+| 8 | Lex's Terms | Lex Vaughn, outside the chapel | Shoot Lex live on her stream (4 photos), then negotiate her contract |
+| 9 | Street Tax | Phone (Dutch, Neon Kings) | Pay protection money, or refuse and run his truck off the boulevard |
+| 10 | Beyond the Frame | Ruby, outside the studio | Premiere red carpet (6 photos), then stop Silas Crane |
+
+Most missions end on a choice that moves your **Respect**, **Street** and your talent's **loyalty**. These decide the ending: The Legit Mogul, King of Fremont, Empire of One, or Own the Frame.
 
 Between missions: photo gigs (phone), Dee's gear shop (photo score, top speed), talent roster (sign Coco and Lex with rep), one studio production per day with daily royalties.
 Photos are scored on composition (face on a thirds point), how much of the frame she fills, and catching the pose; the average sets a quality bonus.

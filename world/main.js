@@ -128,13 +128,32 @@ renderPass.scene = world;
 
 // ---------- save
 const SAVE_KEY = DEMO ? 'mvp_velvet_demo_v1' : 'mvp_world_v2';
-const fresh = () => ({ cash: 250, rep: 0, story: 0, studio: false, roster: [], gear: { stab: 0, lens: 0, light: 0, ride: 0 }, releases: [], day: 1, minute: 23 * 60 + 40, lastProduce: 0, shots: 0, introDone: false });
+const fresh = () => ({ v: 2, street: 0, loyal: {}, choices: {}, dinner: {}, cash: 250, rep: 0, story: 0, studio: false, roster: [], gear: { stab: 0, lens: 0, light: 0, ride: 0 }, releases: [], day: 1, minute: 23 * 60 + 40, lastProduce: 0, shots: 0, introDone: false });
 let save = fresh();
-try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s) { save = Object.assign(fresh(), s); save.gear = Object.assign(fresh().gear, s.gear || {}); } } catch (e) {}
+try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s) {
+  if (!s.v && s.story >= 8) s.story = 10; // saves from the 8-mission build: two missions now sit before the finale
+  save = Object.assign(fresh(), s, { v: 2 }); save.gear = Object.assign(fresh().gear, s.gear || {}); } } catch (e) {}
 // indoors, P holds room coordinates: save the street spot outside that building's door instead
 const outsideDoor = from => { const d = D.pois.find(p => p.id === (from === 'club' ? 'velvet' : 'studio')); return { x: d.x - 1, z: d.z + d.r + 0.8 }; };
 const persist = () => { try { const o = where === 'world' ? P : outsideDoor(where); save.x = o.x; save.z = o.z; localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} };
 const addRep = n => { save.rep = clamp(save.rep + n, 0, 100); };
+// Street cred (0-100): earned on the street (chases, standing up to the Neon Kings). Respect is save.rep.
+const addStreet = n => { save.street = clamp(save.street + n, 0, 100); };
+// Talent loyalty (0-100, starts at 50): choices, paying people right and matching their taste on set.
+const loyal = id => save.loyal[id] ?? 50;
+const addLoyal = (id, n) => { save.loyal[id] = clamp(loyal(id) + n, 0, 100); };
+const feeMul = id => loyal(id) >= 80 ? 0.85 : loyal(id) < 35 ? 1.25 : 1;
+const talentFee = id => Math.round(C.TALENT[id].fee * feeMul(id));
+const refuses = id => loyal(id) < 15;
+const loyalWord = n => n >= 80 ? 'Ride or die' : n >= 60 ? 'Loyal' : n >= 35 ? 'Professional' : n >= 15 ? 'Unhappy' : 'Won\'t work with you';
+function applyFx(fx = {}) {
+  const out = [];
+  if (fx.cash) { save.cash += fx.cash; out.push((fx.cash > 0 ? '+' : '-') + fmt(Math.abs(fx.cash))); }
+  if (fx.rep) { addRep(fx.rep); out.push(`${fx.rep > 0 ? '+' : ''}${fx.rep} Respect`); }
+  if (fx.street) { addStreet(fx.street); out.push(`${fx.street > 0 ? '+' : ''}${fx.street} Street`); }
+  for (const [id, n] of Object.entries(fx.loyal || {})) { addLoyal(id, n); out.push(`${C.TALENT[id].name.split(' ')[0].replace(/"/g, '')} ${n > 0 ? 'trusts you more' : 'trusts you less'}`); }
+  return out.join(' · ');
+}
 
 // ---------- characters
 const springs = new SpringSystem(); springs.amount = 0.5;
@@ -142,7 +161,7 @@ const mvp = C.makeHero(Object.assign({}, C.MVP_LOOK, { camera: true })); world.a
 const NPCS = {};
 function npc(id, look) { const rig = C.makeHero(look); springs.addRig(rig); NPCS[id] = { id, rig, x: 0, z: 0, poseT: rand(0, 3), pose: 0, place: null }; return NPCS[id]; }
 npc('ruby', Object.assign({ outfit: 'two' }, C.TALENT.ruby.look)); npc('nova', Object.assign({ outfit: 'gown' }, C.TALENT.nova.look)); npc('jade', Object.assign({ outfit: 'jump' }, C.TALENT.jade.look));
-npc('coco', Object.assign({ outfit: 'dress' }, C.TALENT.coco.look));
+npc('coco', Object.assign({ outfit: 'dress' }, C.TALENT.coco.look)); npc('lex', Object.assign({ outfit: 'dress' }, C.TALENT.lex.look));
 for (const k of ['tony', 'editor', 'dee', 'landlord', 'bouncer']) npc(k, NPC_LOOKS[k]);
 // Layer 1 = drawn normally and casts shadows, but skipped by the wet-street reflection pass (keeps it cheap).
 const noReflect = o => o.traverse(c => c.layers.set(1));
@@ -190,7 +209,7 @@ function placement(id) {
   switch (id) {
     case 'ruby':
       if (carpetStep) return { scene: 'world', x: N.carpet.x - 3, z: N.carpet.z - 0.6, ry: Math.PI / 2, pose: 'pose' };
-      if (s === 7 && !act) return { scene: 'world', x: 12.6, z: 40, ry: -Math.PI / 2, pose: 'idle' };
+      if (s === 9 && !act) return { scene: 'world', x: 12.6, z: 40, ry: -Math.PI / 2, pose: 'idle' }; // waiting to start the finale
       if (s >= 1 || (inStory === 'velvet' && act.i >= 1)) return { scene: 'club', x: CLUB.stageSpot.x, z: CLUB.stageSpot.z, y: CLUB.stageSpot.y, ry: 0, pose: 'dance' };
       return { scene: 'world', x: N.ruby.x, z: N.ruby.z, ry: N.ruby.ry, pose: 'idle' };
     case 'nova':
@@ -204,6 +223,7 @@ function placement(id) {
       if (s >= 6) return { scene: 'studio', x: -2.2, z: 0.6, ry: 0.6, pose: 'idle' };
       return null;
     case 'coco': return { scene: 'world', x: N.coco.x, z: N.coco.z, ry: N.coco.ry, pose: 'idle' };
+    case 'lex': return s >= 7 || inStory === 'lex' ? { scene: 'world', x: 12.6, z: 72, ry: -Math.PI / 2, pose: inStory === 'lex' && act.i === 0 ? 'pose' : 'idle' } : null; // streaming outside the chapel
     case 'tony': return { scene: 'world', x: N.tony.x, z: N.tony.z, ry: N.tony.ry, pose: 'idle' };
     case 'editor': return s >= 1 ? { scene: 'world', x: N.editor.x, z: N.editor.z, ry: N.editor.ry, pose: 'idle' } : null;
     case 'dee': return { scene: 'world', x: N.dee.x, z: N.dee.z, ry: N.dee.ry, pose: 'idle' };
@@ -245,10 +265,13 @@ function nextStep() {
   if (st.t === 'chase') spawnChaser(st);
   if (st.t === 'enter' && where === st.scene) return nextStep();
   toast(st.text); refreshHud();
+  if (st.t === 'choice') { const a = act; choose(st.c, o => { if (act !== a) return; if (o.end) { act.ended = o; act.i = act.m.steps.length - 1; } nextStep(); }); }
 }
 function completeMission() {
-  const m = act.m, kind = act.kind; act = null; removeChaser();
-  save.cash += m.reward.cash; addRep(m.reward.rep);
+  const m = act.m, kind = act.kind, ended = act.ended; act = null; removeChaser();
+  const reward = ended ? { cash: 0, rep: 0 } : m.reward; // ended early by a choice (e.g. paying the street tax): no reward
+  save.cash += reward.cash; addRep(reward.rep); if (reward.street) addStreet(reward.street);
+  if (m.reward.sign && !(m.reward.sign in save.loyal)) save.loyal[m.reward.sign] = loyal(m.reward.sign);
   if (m.reward.sign && !save.roster.includes(m.reward.sign)) save.roster.push(m.reward.sign);
   const oldRung = RUNGS[Math.min(save.story, RUNGS.length - 1)][0];
   if (kind === 'story') save.story++;
@@ -258,9 +281,16 @@ function completeMission() {
   }
   const rung = RUNGS[Math.min(save.story, RUNGS.length - 1)];
   persist(); sfx('win'); refreshHud();
-  const extra = `<p class="money">+${fmt(m.reward.cash)} · +${m.reward.rep} rep${m.reward.sign ? ` · ${esc(C.TALENT[m.reward.sign].name)} signs with MVP Media` : ''}</p>${kind === 'story' && rung[0] !== oldRung ? `<p><b>Promoted: ${esc(rung[0])}</b> · ${esc(rung[1])}</p>` : ''}`;
-  talk(m.outro || [], () => panelCard(kind === 'story' ? 'Mission complete' : 'Gig complete', m.title, extra, save.story >= STORY.length && kind === 'story' ? [['Roll credits', openEnding]] : [['Continue', closePanel]]));
+  const extra = `<p class="money">+${fmt(reward.cash)} · +${reward.rep} Respect${reward.street ? ` · +${reward.street} Street` : ''}${m.reward.sign ? ` · ${esc(C.TALENT[m.reward.sign].name)} signs with MVP Media` : ''}</p>${kind === 'story' && rung[0] !== oldRung ? `<p><b>Promoted: ${esc(rung[0])}</b> · ${esc(rung[1])}</p>` : ''}`;
+  const done = () => panelCard(kind === 'story' ? 'Mission complete' : 'Gig complete', m.title, extra, save.story >= STORY.length && kind === 'story' ? [['Roll credits', openEnding]] : [['Continue', closePanel]]);
+  talk(ended ? [] : m.outro || [], () => m.choice && kind === 'story' ? choose(m.choice, done) : done());
   if (kind === 'gig' && freeModel) { const f = freeModel; setTimeout(() => { if (f.rig.root.parent) f.rig.root.parent.remove(f.rig.root); }, 4000); freeModel = null; }
+}
+// a moral call: one panel, no way to wave it off; effects show as a toast, then the reply plays
+function choose(c, done) {
+  const opts = c.options.map(o => { const short = o.fx && o.fx.cash < 0 && save.cash < -o.fx.cash;
+    return [esc(o.label), () => { if (short) return; closePanel(); save.choices[c.id] = o.id; const sum = applyFx(o.fx); persist(); refreshHud(); if (sum) toast(sum); sfx('click'); talk(o.reply || [], () => done && done(o)); }, { plain: true, disabled: short, small: short ? `You can't afford it (${fmt(-o.fx.cash)})` : o.small || '' }]; });
+  panelCard('Your call', c.title, `<p>${esc(c.text)}</p>`, opts); panel.dataset.locked = 'true';
 }
 function failMission(why) {
   const m = act.m, kind = act.kind; act = null; removeChaser(); sfx('fail'); refreshHud();
@@ -268,6 +298,7 @@ function failMission(why) {
 }
 let chaser = null;
 function spawnChaser(st) {
+  st = Object.assign({}, st, { hp: Math.round(st.hp * (1 - save.street / 250)) }); // Street cred: the Neon Kings fold faster
   const m = carModel(st.color); world.add(m);
   chaser = new Chaser(m, { hp: st.hp, speed: st.speed, x: st.spawn.x, z: st.spawn.z, from: st.spawn.from, to: st.spawn.to });
   // a glowing marker rides above the target so it can be found at night from anywhere
@@ -400,7 +431,7 @@ function advance() { sfx('click'); voices.stop(); dialog.i++; if (dialog.i >= di
 $('#dialog').addEventListener('click', () => dialog && advance());
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 3400); }
 const panel = $('#panel'); let panelActs = [];
-function showPanel(html, acts) { try { document.exitPointerLock(); } catch (e) {} panel.innerHTML = html; panel.dataset.dismissible = 'false'; panel.hidden = false; panelActs = acts || []; const b = panel.querySelector('button.b:not([disabled])'); b && b.focus({ preventScroll: true }); }
+function showPanel(html, acts) { try { document.exitPointerLock(); } catch (e) {} panel.innerHTML = html; panel.dataset.dismissible = 'false'; panel.dataset.locked = 'false'; panel.hidden = false; panelActs = acts || []; const b = panel.querySelector('button.b:not([disabled])'); b && b.focus({ preventScroll: true }); }
 function closePanel() { panel.hidden = true; panel.innerHTML = ''; panelActs = []; paused = false; }
 // ---------- pause: Esc, the II button, losing mouse lock or switching tabs. Everything (timers included) stops.
 let paused = false, pausedAt = 0;
@@ -424,7 +455,7 @@ function panelCard(eyebrow, title, body, buttons, wide) {
 let zoneName = '';
 function setZone(name) { if (name === zoneName) return; zoneName = name; const z = $('#zone'); z.textContent = name; z.classList.remove('pop'); void z.offsetWidth; z.classList.add('pop'); }
 function refreshHud() {
-  $('#money').innerHTML = `<b>${fmt(save.cash)}</b><i>${esc(RUNGS[Math.min(save.story, RUNGS.length - 1)][0].toUpperCase())} · REP ${save.rep}</i>`;
+  $('#money').innerHTML = `<b>${fmt(save.cash)}</b><i>${esc(RUNGS[Math.min(save.story, RUNGS.length - 1)][0].toUpperCase())} </i><i class="meters">RESPECT <em>${save.rep}</em> · STREET <em>${save.street}</em></i>`;
   const st = step(), n = nextStory();
   $('#objective').textContent = st ? st.text : n ? (n.giver === 'phone' ? 'Answer the phone (PHONE / Tab)' : `${n.title}: meet ${n.who}`) : 'Run your empire: gigs, films, royalties';
 }
@@ -432,7 +463,7 @@ function refreshHud() {
 // phone menu: story, gigs, talent, studio, save
 let gigs = [], gigsDay = 0;
 function makeGig() {
-  const spot = pick(GIG_SPOTS), name = pick(FREELANCE), look = pick(FREE_LOOKS), pay = Math.round((250 + save.rep * 12 + rand(0, 200)) / 10) * 10, rush = Math.random() < 0.4;
+  const spot = pick(GIG_SPOTS), name = pick(FREELANCE), look = pick(FREE_LOOKS), pay = Math.round((250 + save.rep * 12 + save.street * 5 + rand(0, 200)) / 10) * 10, rush = Math.random() < 0.4;
   return { id: 'gig', title: `${spot.label} · ${name}`, who: name, look, at: spot.at, place: spot.place, pay, rush,
     steps: [{ t: 'goto', to: spot.at, time: rush ? 90 : undefined, text: `${rush ? 'Rush: ' : ''}Meet ${name} at ${spot.place}` }, { t: 'shoot', scene: 'world', subjects: ['free'], shots: 4, text: `Shoot ${spot.label.toLowerCase()} with ${name} (4 photos)` }],
     reward: { cash: pay, rep: rush ? 4 : 3 }, outro: [[name, 'Love these. I am tagging MVP Media on everything.']] };
@@ -455,7 +486,7 @@ function openPhone() {
   sfx('click');
   const n = nextStory(), st = step();
   const story = STORY.map((m, i) => `<div class="${i < save.story ? 'done' : i === save.story ? 'now' : ''}"><span>${i + 1}. ${esc(m.title)}</span><span>${i < save.story ? 'Done' : i === save.story ? (act && act.kind === 'story' ? 'In progress' : esc(m.giver === 'phone' ? 'Phone' : m.who)) : 'Locked'}</span></div>`).join('');
-  panelCard(`Day ${save.day} · ${fmt(save.cash)} · Rep ${save.rep}`, 'MVP Phone', `<div class="list">${story}</div><p class="muted">${st ? 'Now: ' + esc(st.text) : n ? `Next: ${esc(n.title)}, ${n.giver === 'phone' ? 'answer the call below' : 'find ' + esc(n.who) + ' (gold beacon)'}` : 'Story complete. Keep shooting, keep producing.'}</p>`, [
+  panelCard(`Day ${save.day} · ${fmt(save.cash)} · Respect ${save.rep} · Street ${save.street}`, 'MVP Phone', `<div class="list">${story}</div><p class="muted">${st ? 'Now: ' + esc(st.text) : n ? `Next: ${esc(n.title)}, ${n.giver === 'phone' ? 'answer the call below' : 'find ' + esc(n.who) + ' (gold beacon)'}` : 'Story complete. Keep shooting, keep producing.'}</p>`, [
     ...(n && n.giver === 'phone' && !act ? [['Answer: ' + n.who, () => { closePanel(); sfx('phone'); talk(n.intro, () => startMission(n, 'story')); }]] : []),
     ['Photo gigs', openGigs, { plain: true, small: act ? 'Finish your current job first' : '', disabled: !!act }],
     ['Talent roster', openRoster, { plain: true }],
@@ -469,11 +500,12 @@ function openPhone() {
     ['Close', closePanel, { plain: true }],
   ]);
 }
-const bootleg = () => save.story === 6; // Silas is pirating the catalog until Bootleg Boulevard is won
-const dailyRoyalty = () => Math.round(save.releases.reduce((s, r) => s + r.royalty, 0) * (bootleg() ? 0.5 : 1));
+const bootleg = () => save.story === 6 || save.choices.bootleg === 'cut'; // pirated until Bootleg Boulevard is won, or forever if you took the cut
+const bootlegShare = () => save.story === 6 ? 0.5 : 0.2;
+const dailyRoyalty = () => Math.round(save.releases.reduce((s, r) => s + r.royalty, 0) * (bootleg() ? 1 - bootlegShare() : 1));
 function openCatalog() {
   const rows = save.releases.map(r => `<div><span>${esc(r.title)}</span><span>Q ${r.q} · ${fmt(r.royalty)}/day</span></div>`).join('');
-  panelCard('MVP Media', 'The catalog', `${rows ? `<div class="list">${rows}</div>` : '<p class="muted">Nothing released yet. Buy a room, cast it, light it, call it.</p>'}<p>Royalties <span class="money">${fmt(dailyRoyalty())}</span> per day${bootleg() ? ' · <b>bootlegs are eating half of it</b>' : ''}</p>`, [['Back', openPhone, { plain: true }]]);
+  panelCard('MVP Media', 'The catalog', `${rows ? `<div class="list">${rows}</div>` : '<p class="muted">Nothing released yet. Buy a room, cast it, light it, call it.</p>'}<p>Royalties <span class="money">${fmt(dailyRoyalty())}</span> per day${bootleg() ? ` · <b>bootlegs are eating ${Math.round(bootlegShare() * 100)}% of it</b>` : ''}</p>`, [['Back', openPhone, { plain: true }]]);
 }
 function openGigs() {
   if (gigsDay !== save.day || !gigs.length) { gigs = [makeGig(), makeGig(), makeGig()]; gigsDay = save.day; }
@@ -482,9 +514,14 @@ function openGigs() {
 function openRoster() {
   const btns = Object.entries(C.TALENT).map(([id, t]) => {
     const signed = save.roster.includes(id), lexLock = id === 'lex' && save.releases.length < 2, can = !signed && !lexLock && t.req > 0 && save.rep >= t.req && save.cash >= t.fee * 2;
-    return [`${esc(t.name)} <small>· ${t.age} · ${esc(t.role)}</small>`, () => { if (!can) return; save.cash -= t.fee * 2; save.roster.push(id); sfx('cash'); persist(); refreshHud(); openRoster(); }, { plain: true, sel: signed, disabled: !signed && !can, small: signed ? 'Under contract' : t.req === 0 ? 'Meet her in the story' : lexLock ? 'Release 2 films first' : save.rep < t.req ? `Needs ${t.req} rep` : `Sign for ${fmt(t.fee * 2)}` }];
+    return [`${esc(t.name)} <small>· ${t.age} · ${esc(t.role)}</small>`, () => { if (signed) return openTalent(id); if (!can) return; save.cash -= t.fee * 2; save.roster.push(id); save.loyal[id] = loyal(id); sfx('cash'); persist(); refreshHud(); openRoster(); }, { plain: true, sel: signed, disabled: !signed && !can, small: signed ? `Under contract · loyalty ${loyal(id)} · ${loyalWord(loyal(id))}` : t.req === 0 ? 'Meet her in the story' : lexLock ? 'Release 2 films first' : save.rep < t.req ? `Needs ${t.req} rep` : `Sign for ${fmt(t.fee * 2)}` }];
   });
-  panelCard('Talent roster', 'Who works with MVP Media', '<p class="muted">Everybody knows what they are worth. Rep opens doors, cash closes deals.</p>', [...btns, ['Back', openPhone, { plain: true }]]);
+  panelCard('Talent roster', 'Who works with MVP Media', '<p class="muted">Everybody knows what they are worth. Respect opens doors, cash closes deals, loyalty keeps them. Tap a signed performer to see how she feels about you.</p>', [...btns, ['Back', openPhone, { plain: true }]]);
+}
+function openTalent(id) {
+  const t = C.TALENT[id], l = loyal(id), ate = save.dinner[id] === save.day;
+  panelCard('Talent roster', t.name, `<p>${esc(t.bio || '')}</p><p>Loyalty <b>${l}</b> / 100 · ${loyalWord(l)}</p><p class="muted">Day rate ${fmt(talentFee(id))}${feeMul(id) < 1 ? ' (loyalty discount)' : feeMul(id) > 1 ? ' (she charges you extra)' : ''}. Loyalty goes up when you pay people right, protect their work and light them the way they like. Below 15 she won't work with you.</p>`,
+    [[`Take her to dinner <small>${fmt(250)} · once a day</small>`, () => { if (ate || save.cash < 250) return; save.cash -= 250; save.dinner[id] = save.day; addLoyal(id, 8); sfx('cash'); persist(); refreshHud(); toast(`${t.name.split(' ')[0].replace(/"/g, '')} had a good night. Loyalty +8`); openTalent(id); }, { plain: true, disabled: ate || save.cash < 250, small: ate ? 'Already tonight' : '' }], ['Back', openRoster, { plain: true }]]);
 }
 function openShop() {
   const btns = GEAR.map(g => { const lv = save.gear[g.id], cost = Math.round(g.base * Math.pow(1.8, lv)), max = lv >= g.max; return [`${g.name} <small>Lv ${lv}/${g.max} · ${g.desc}</small>`, () => { if (max || save.cash < cost) return; save.cash -= cost; save.gear[g.id]++; sfx('cash'); persist(); refreshHud(); openShop(); }, { plain: true, disabled: max || save.cash < cost, small: max ? 'Maxed' : fmt(cost) }]; });
@@ -501,12 +538,13 @@ function openStudio() {
   startProduction(!!(st && st.t === 'produce'));
 }
 function startProduction(story) { prod = { story, cast: story ? ['jade'] : [], set: 'stage', budget: story ? 0 : 1, calls: {} }; renderProd(); }
-const prodCost = () => (prod.story ? 0 : prod.cast.reduce((s, id) => s + C.TALENT[id].fee, 0)) + SETS[prod.set].cost + BUDGET[prod.budget].cost;
+const prodCost = () => (prod.story ? 0 : prod.cast.reduce((s, id) => s + talentFee(id), 0)) + SETS[prod.set].cost + BUDGET[prod.budget].cost;
 function renderProd() {
   const roster = [...new Set([...save.roster, ...(prod.story ? ['jade'] : [])])];
   const cost = prodCost(), ok = prod.cast.length && save.cash >= cost, b = [];
   b.push([`Lights, camera, action <small>${fmt(cost)}</small>`, () => { if (!ok) return; save.cash -= cost; refreshHud(); prod.stage = 0; renderCall(); }, { disabled: !ok }]);
-  for (const id of roster) b.push([`${esc(C.TALENT[id].name)} <small>${'★'.repeat(C.TALENT[id].star)}</small>`, () => { const i = prod.cast.indexOf(id); if (i >= 0) prod.cast.splice(i, 1); else if (prod.cast.length < 2) prod.cast.push(id); renderProd(); }, { plain: true, sel: prod.cast.includes(id), small: prod.story && id === 'jade' ? 'Working for points' : fmt(C.TALENT[id].fee) }]);
+  for (const id of roster) { const no = refuses(id) && !(prod.story && id === 'jade');
+    b.push([`${esc(C.TALENT[id].name)} <small>${'★'.repeat(C.TALENT[id].star)}</small>`, () => { if (no) return; const i = prod.cast.indexOf(id); if (i >= 0) prod.cast.splice(i, 1); else if (prod.cast.length < 2) prod.cast.push(id); renderProd(); }, { plain: true, disabled: no, sel: prod.cast.includes(id), small: no ? "Won't work with you · take her to dinner" : (prod.story && id === 'jade' ? 'Working for points' : fmt(talentFee(id))) + ` · loyalty ${loyal(id)}` }]); }
   for (const [k, s] of Object.entries(SETS)) b.push([s.name, () => { prod.set = k; renderProd(); }, { plain: true, sel: prod.set === k, small: (s.cost ? fmt(s.cost) : 'Free') + ' · ' + esc(s.look) }]);
   BUDGET.forEach((bu, i) => b.push([`${bu.name} crew`, () => { prod.budget = i; renderProd(); }, { plain: true, sel: prod.budget === i, small: bu.cost ? fmt(bu.cost) : 'Free' }]));
   if (!prod.story) b.push(['Cancel', closePanel, { plain: true }]);
@@ -521,14 +559,25 @@ function wrapProd() {
   const cast = prod.cast.map(id => C.TALENT[id]);
   let q = cast.reduce((s, t) => s + t.star * 12, 0) / cast.length + (cast.length === 2 ? 8 : 0) + SETS[prod.set].q + save.gear.light * 5;
   for (const t of cast) { if (t.light === prod.calls.light) q += 7; if (t.mood === prod.calls.mood) q += 7; }
+  q += prod.cast.reduce((s, id) => s + (loyal(id) - 50) / 8, 0) / prod.cast.length; // loyal talent gives you more on set
+  const loyNotes = prod.cast.map(id => { const t = C.TALENT[id], n = (t.light === prod.calls.light ? 3 : -2) + (t.mood === prod.calls.mood ? 3 : -2) + (prod.budget === 2 ? 2 : 0); addLoyal(id, n); return `${t.name.split(' ')[0].replace(/"/g, '')} ${n > 0 ? 'loved' : 'didn\'t love'} it (loyalty ${n > 0 ? '+' : ''}${n})`; });
   q += prod.calls.cam === 'dolly' ? 5 : prod.calls.cam === 'handheld' ? 3 : 1; q = Math.round(clamp(q * BUDGET[prod.budget].m, 10, 100));
   // film income: about a third of the original payout, so gigs, gear and missions still matter
   const gross = Math.round(q * (25 + save.rep) * 0.72), royalty = Math.round(gross * 0.05), title = FILM_TITLES[save.releases.length % FILM_TITLES.length] + (save.releases.length >= FILM_TITLES.length ? ' ' + (save.releases.length + 1) : '');
-  panelCard('Wrap', "Cut! That's a wrap.", `<p>${q >= 75 ? 'The scene works. Everybody hit their marks and you can feel it in the dailies.' : q >= 50 ? 'Solid, sellable, nobody will remember it next year.' : 'It opens soft and dies at the box office. Listen to your talent next time.'}</p><h2>${esc(title)}</h2><p>Quality <b>${q}</b> / 100 · Opening sales <span class="money">${fmt(gross)}</span> · Royalties <span class="money">${fmt(royalty)}</span> per day</p>`,
+  panelCard('Wrap', "Cut! That's a wrap.", `<p>${q >= 75 ? 'The scene works. Everybody hit their marks and you can feel it in the dailies.' : q >= 50 ? 'Solid, sellable, nobody will remember it next year.' : 'It opens soft and dies at the box office. Listen to your talent next time.'}</p><h2>${esc(title)}</h2><p>Quality <b>${q}</b> / 100 · Opening sales <span class="money">${fmt(gross)}</span> · Royalties <span class="money">${fmt(royalty)}</span> per day</p><p class="muted">${esc(loyNotes.join(' · '))}</p>`,
     [['Release it', () => { save.cash += gross; save.releases.push({ title, royalty, q }); save.lastProduce = save.day; addRep(q >= 70 ? 5 : 2); sfx('win'); persist(); closePanel(); refreshHud(); toast(`${title} is out. ${fmt(gross)} in opening sales.`); const st = step(); const wasStory = prod.story; prod = null; if (wasStory && st && st.t === 'produce') nextStep(); }]]);
 }
+// three endings (plus the default), decided by how you played: Respect, Street and your talent's loyalty
+function endingFor() {
+  const ids = save.roster.length ? save.roster : ['ruby'], avg = ids.reduce((s, id) => s + loyal(id), 0) / ids.length;
+  if (avg < 40) return ['Empire of One', 'You own the frame, the film and the building. Shame nobody wants to stand in front of your camera anymore. The talent took their calls elsewhere.'];
+  if (save.street >= 50) return ['King of Fremont', 'The Neon Kings pull over when your car rolls by. Nobody bootlegs MVP Media twice. The studio runs on nerve, and the whole boulevard knows it.'];
+  if (save.rep >= 70 && avg >= 60) return ['The Legit Mogul', 'Clean books, paid crews, performers who trust you with their names. Every agent on the Strip wants your number, and the catalog pays while you sleep.'];
+  return ['Own the Frame', 'From room 12 at the Desert Rose to Mogul. You made the work, you kept the masters, and the town learned your name.'];
+}
 function openEnding() {
-  panelCard('MVP MEDIA · LAS VEGAS', 'The Underground Cut', `<p><b>Own the frame. Then own the film.</b></p><p>From room 12 at the Desert Rose to Mogul. The story is complete, but the city keeps going: gigs, films and royalties are still on the table.</p><p class="muted">${save.releases.length} films · ${save.shots} photos · ${fmt(save.cash)} in the bank</p>`, [['Keep playing', closePanel]]);
+  const [title, text] = endingFor(), ids = save.roster;
+  panelCard('MVP MEDIA · LAS VEGAS · ENDING', title, `<p><b>Own the frame. Then own the film.</b></p><p>${esc(text)}</p><p class="muted">Respect ${save.rep} · Street ${save.street} · ${ids.map(id => `${esc(C.TALENT[id].name.split(' ')[0].replace(/"/g, ''))} ${loyal(id)}`).join(' · ')}</p><p class="muted">${save.releases.length} films · ${save.shots} photos · ${fmt(save.cash)} in the bank. The story is complete, but the city keeps going: gigs, films and royalties are still on the table.</p>`, [['Keep playing', closePanel]]);
 }
 
 // ---------- collision + interaction
@@ -647,7 +696,7 @@ function update(dt) {
   if (DEMO && !panel.hidden) { if ((pressed.has('Escape') || pressed.has('Tab')) && panel.dataset.dismissible === 'true') closePanel(); return; }
   if (paused) { if (pressed.has('Escape') && performance.now() - pausedAt > 300) { closePanel(); pressed.delete('Escape'); } return; }
   T += dt;
-  save.minute += dt * 2; if (save.minute >= 1440) { save.minute -= 1440; save.day++; const roy = dailyRoyalty(); if (roy) { save.cash += roy; toast(`Royalties: your films earned ${fmt(roy)} today${bootleg() ? ' (bootlegs took half)' : ''}`); sfx('cash'); refreshHud(); } }
+  save.minute += dt * 2; if (save.minute >= 1440) { save.minute -= 1440; save.day++; const roy = dailyRoyalty(); if (roy) { save.cash += roy; toast(`Royalties: your films earned ${fmt(roy)} today${bootleg() ? ' (after the bootleggers\' cut)' : ''}`); sfx('cash'); refreshHud(); } }
   const h = Math.floor(save.minute / 60), mi = Math.floor(save.minute % 60); $('#clock').textContent = `DAY ${save.day} · ${((h + 11) % 12) + 1}:${String(mi).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
   if (!save.introDone && T > 1.5 && !dialog && panel.hidden) { save.introDone = true; persist(); const n = nextStory(); if (n && n.giver === 'phone' && !act) { sfx('phone'); talk(n.intro, () => startMission(n, 'story')); } }
   const blocked = !!dialog || !panel.hidden;
@@ -655,7 +704,7 @@ function update(dt) {
   if (!blocked) { if (keys.has('KeyW') || keys.has('ArrowUp')) f += 1; if (keys.has('KeyS') || keys.has('ArrowDown')) f -= 1; if (keys.has('KeyD') || keys.has('ArrowRight')) r += 1; if (keys.has('KeyA') || keys.has('ArrowLeft')) r -= 1; } else { f = r = 0; }
   if (dialog && (pressed.has('KeyE') || pressed.has('Space') || pressed.has('Enter'))) advance();
   if (pressed.has('Tab') || pressed.has('KeyM')) openPhone();
-  if (pressed.has('Escape') && !panel.hidden) closePanel(); else if (pressed.has('Escape') && !dialog) pauseGame();
+  if (pressed.has('Escape') && !panel.hidden) { if (panel.dataset.locked !== 'true') closePanel(); } else if (pressed.has('Escape') && !dialog) pauseGame();
   if (driving) {
     const hit = car.update(dt, { f: clamp(f, -1, 1), r: clamp(r, -1, 1), brake: keys.has('Space') && !blocked }, D, traffic, 32 + save.gear.ride * 4);
     if (hit > 6) { shake = Math.min(0.6, hit / 40); sfx('bump'); }

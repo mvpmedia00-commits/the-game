@@ -387,6 +387,21 @@ The world game still uses the code-built characters; swapping the real models in
 - **Saves:** indoors, the save stores the street spot outside that building's door.
 - **Age gate:** `assets/agegate.js` asks once per device (`mvp_age_ok`). The game waits for `window.mvpAgeOk`.
 
+## 12f. Choices, meters, loyalty, endings
+
+- **Choices:** a mission's `choice` (shown after its outro) or a `{ t: 'choice', c }` step (mid-mission) opens `choose()`.
+  - The panel can't be closed with Esc.
+  - Each option's `fx` goes through `applyFx()`: cash, rep (Respect), street, and loyal per performer. `end: true` finishes the mission early with no reward.
+  - Picks are stored in `save.choices[id]`.
+- **Street:** `save.street`, raised by `reward.street` and choices. `spawnChaser` cuts chaser health by street/250, and gigs pay +$5 per point.
+- **Loyalty:**
+  - `save.loyal[id]`, read with `loyal(id)`; it starts at 50.
+  - `talentFee()` applies the 0.85× / 1.25× fee multiplier, and `refuses()` is true under 15.
+  - `wrapProd` adds (loyalty − 50)/8 to quality and adjusts loyalty from taste matches.
+  - Dinner (`openTalent`) adds 8 loyalty, once per performer per day.
+- **Endings:** `endingFor()`, checked in order: Empire of One (average loyalty < 40), King of Fremont (Street ≥ 50), The Legit Mogul (Respect ≥ 70 and loyalty ≥ 60), Own the Frame.
+- **Saves:** `save.v = 2`. Saves from the 8-mission build that had finished the story (`story >= 8`) become `story = 10`. Lex's Terms and Street Tax sit at indices 7–8, before the finale.
+
 ## 13. Testing and debugging
 
 - `window.__world` in the browser console exposes the game state: `__world.save` (edit cash, story, etc.), `__world.startMission(__world.STORY[3], 'story')`, `__world.enter('club')`, `__world.update(0.033)` to step one frame (`__world.tick(dt)` also clears key presses, for scripted tests).
