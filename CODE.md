@@ -410,6 +410,13 @@ The world game still uses the code-built characters; swapping the real models in
 - **Endings:** `endingFor()`, checked in order: Empire of One (average loyalty < 40), King of Fremont (Street ≥ 50), The Legit Mogul (Respect ≥ 70 and loyalty ≥ 60), Own the Frame.
 - **Saves:** `save.v = 2`. Saves from the 8-mission build that had finished the story (`story >= 8`) become `story = 10`. Lex's Terms and Street Tax sit at indices 7–8, before the finale.
 
+## 12g. Voices and phone calls
+
+- **Lines:** `Voices.say()` (`world/lib/audio.js`) first tries `assets/voices/<voiceId(who, text)>.mp3`, decoded through Web Audio; otherwise the browser's speech synthesis reads the line.
+  - Lines spoken on the phone (`talk(lines, done, { phone: true })`, except MVP's own lines) get a band-pass "phone speaker" filter, and the dialog shows 📞.
+- **File names:** `tools/voice-lines.mjs` writes `assets/voices/LINES.md`, listing every line with its file name. The file name is the speaker plus a hash of the exact text. See `assets/voices/README.md`.
+- **Calls:** story missions given by phone ring by themselves (`incomingCall`). Answer plays the call; Decline leaves a "Call back" button in the PHONE menu. The Answer tap also unlocks audio and speech on phones.
+
 ## 13. Testing and debugging
 
 - `window.__world` in the browser console exposes the game state: `__world.save` (edit cash, story, etc.), `__world.startMission(__world.STORY[3], 'story')`, `__world.enter('club')`, `__world.update(0.033)` to step one frame (`__world.tick(dt)` also clears key presses, for scripted tests).

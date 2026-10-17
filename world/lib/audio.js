@@ -1,8 +1,9 @@
 // Soundtrack + spoken dialogue for the world.
 // Music is generated live with Web Audio (original, nothing licensed, safe to stream): one track per mood,
 // switching on the bar: 'street' synthwave, 'club' house, 'studio' lo-fi, 'chase' high-energy.
-// Dialogue is read aloud with the browser's speech synthesis, a distinct voice per character; the music
-// ducks under it.
+// Dialogue: a recorded voice file plays when one exists (assets/voices/<id>.mp3, see assets/voices/README.md),
+// otherwise the browser's speech synthesis reads the line with a distinct voice per character. Callers on the
+// phone get a phone-speaker filter. The music ducks under every line.
 
 const NOTE = n => 440 * Math.pow(2, (n - 69) / 12); // MIDI note -> Hz
 // A minor family: Am F C G (street/chase), Am7 Dm7 Em7 Am7 (club), Fmaj7 Em7 Dm7 Cmaj7 (studio)
@@ -82,14 +83,23 @@ export class Music {
 const CAST = { // pitch, rate, voice gender
   'MVP': [0.9, 1.0, 'm'], 'Ruby Monroe': [1.05, 1.0, 'f'], 'Tony Velvet': [0.85, 1.12, 'm'], 'Editor': [1.0, 1.08, 'f'], 'Dee': [1.15, 1.05, 'f'],
   'Nova Starr': [1.25, 0.98, 'f'], 'Jade Rivers': [0.9, 0.95, 'f'], 'Coco Bellamy': [1.3, 1.05, 'f'], 'Landlord': [0.75, 0.9, 'm'], 'Bouncer': [0.55, 0.9, 'm'],
-  'Silas Crane': [0.65, 0.88, 'm'], 'Doorman': [0.8, 1.0, 'm'],
+  'Silas Crane': [0.65, 0.88, 'm'], 'Doorman': [0.8, 1.0, 'm'], 'Lex Vaughn': [1.1, 1.05, 'f'], 'Dutch': [0.6, 0.92, 'm'],
+  'Driver': [1.0, 1.15, 'm'], 'Brand rep': [1.05, 1.1, 'f'], 'Grip': [0.8, 1.0, 'm'],
 };
+export const SPEAKERS = Object.keys(CAST);
+// The file name for a recorded line: speaker + a short fingerprint of the exact text (change the text, re-record).
+export function voiceId(who, text) {
+  let h = 0x811c9dc5; const s = who + '|' + text;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return who.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + h.toString(36);
+}
 const FEMALE = /female|woman|samantha|victoria|karen|moira|tessa|fiona|zira|susan|serena|allison|ava|kate|libby|sonia|aria|jenny|michelle|google uk english female|google us english/i;
 const MALE = /\bmale\b|daniel|alex|fred|david|mark|guy|ryan|thomas|oliver|george|arthur|tom|aaron|google uk english male/i;
 
 export class Voices {
-  constructor() {
+  constructor(base) {
     this.ok = typeof speechSynthesis !== 'undefined'; this.on = true; this.list = [];
+    this.base = base || null; this.ac = null; this.out = null; this.cache = new Map(); this.missing = new Set(); this.src = null; this.token = 0;
     if (this.ok) { const load = () => { this.list = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang)); }; load(); speechSynthesis.addEventListener?.('voiceschanged', load); }
   }
   pick(gender, who) {
@@ -98,9 +108,41 @@ export class Voices {
     let h = 0; for (const c of who) h = (h * 31 + c.charCodeAt(0)) >>> 0;
     return list[h % list.length];
   }
-  // speak a dialogue line; onStart/onEnd let the game duck the music
-  say(who, text, onStart, onEnd) {
-    if (!this.ok || !this.on || !text || who === 'Sign') { onEnd && onEnd(); return; }
+  // recorded files play through Web Audio (so the phone filter works and phones allow playback after the first tap)
+  attach(ac, out) { this.ac = ac; this.out = out; }
+  // mobile browsers only allow speech after a tap: speak one silent line from inside the first tap
+  unlock() { if (!this.ok || this.unlocked) return; this.unlocked = true; try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) {} }
+  async file(id) {
+    if (!this.base || !this.ac || this.missing.has(id)) return null;
+    if (this.cache.has(id)) return this.cache.get(id);
+    try { const r = await fetch(this.base + id + '.mp3'); if (!r.ok) throw 0; const buf = await this.ac.decodeAudioData(await r.arrayBuffer()); this.cache.set(id, buf); return buf; }
+    catch (e) { this.missing.add(id); return null; }
+  }
+  playFile(buf, phone, onStart, onEnd) {
+    const ac = this.ac, s = ac.createBufferSource(), g = ac.createGain(); s.buffer = buf; g.gain.value = phone ? 1.4 : 1;
+    let node = s;
+    if (phone) { // phone speaker: narrow band, a little grit
+      const hp = ac.createBiquadFilter(), lp = ac.createBiquadFilter(), sh = ac.createWaveShaper(), c = new Float32Array(256);
+      hp.type = 'highpass'; hp.frequency.value = 380; lp.type = 'lowpass'; lp.frequency.value = 3200;
+      for (let i = 0; i < 256; i++) { const x = i / 128 - 1; c[i] = Math.tanh(x * 2.2); } sh.curve = c;
+      s.connect(hp); hp.connect(lp); lp.connect(sh); node = sh;
+    }
+    node.connect(g); g.connect(this.out);
+    s.onended = () => { if (this.src === s) { this.src = null; onEnd && onEnd(); } };
+    this.src = s; s.start(); onStart && onStart();
+  }
+  // speak a dialogue line; onStart/onEnd let the game duck the music. opts.phone: the speaker is on the phone
+  say(who, text, onStart, onEnd, opts = {}) {
+    this.stop(); const token = this.token;
+    if (!this.on || !text || who === 'Sign') { onEnd && onEnd(); return; }
+    this.file(voiceId(who, text)).then(buf => {
+      if (token !== this.token) return; // the player moved on
+      if (buf) return this.playFile(buf, opts.phone, onStart, onEnd);
+      this.tts(who, text, onStart, onEnd);
+    });
+  }
+  tts(who, text, onStart, onEnd) {
+    if (!this.ok) { onEnd && onEnd(); return; }
     speechSynthesis.cancel();
     const [pitch, rate, g] = CAST[who] || [1.1, 1.0, /^(Tasha|Monique|Valentina|Brielle|Kenya|Dani|Mariah|Simone)$/.test(who) ? 'f' : 'm'];
     const u = new SpeechSynthesisUtterance(text.replace(/MVP/g, 'M V P')); u.pitch = pitch; u.rate = rate; u.volume = 1;
@@ -108,5 +150,5 @@ export class Voices {
     u.onstart = () => onStart && onStart(); u.onend = u.onerror = () => onEnd && onEnd();
     speechSynthesis.speak(u);
   }
-  stop() { if (this.ok) speechSynthesis.cancel(); }
+  stop() { this.token++; if (this.src) { const s = this.src; this.src = null; try { s.stop(); } catch (e) {} } if (this.ok) speechSynthesis.cancel(); }
 }
