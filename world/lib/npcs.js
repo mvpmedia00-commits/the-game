@@ -76,7 +76,7 @@ export class Traffic {
       for (const o of this.cars) if (o !== c && o.L === L) { const gap = (o.s - c.s) * L.dir; if (gap > 0 && gap < 12) target = Math.min(target, Math.max(0, (gap - 6) * 1.2)); }
       // player in the lane ahead
       const px = L.axis === 'z' ? player.x : player.z, pz = L.axis === 'z' ? player.z : player.x;
-      if (Math.abs(px - L.c) < 2 && (pz - c.s) * L.dir > 0 && (pz - c.s) * L.dir < 12) target = 0;
+      if (Math.abs(px - L.c) < 2 && (pz - c.s) * L.dir > 0 && (pz - c.s) * L.dir < 16) target = 0; // 16 m: enough to stop from top speed
       for (const e of extra) { const ex = L.axis === 'z' ? e.x : e.z, ez = L.axis === 'z' ? e.z : e.x; if (Math.abs(ex - L.c) < 2.4 && (ez - c.s) * L.dir > 0 && (ez - c.s) * L.dir < 14) target = Math.min(target, 0); }
       if (c.stun > 0) { c.stun -= dt; target = 0; }
       if (c.stun > 0) c.v *= 0.9;

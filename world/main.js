@@ -485,7 +485,10 @@ function moveChar(c, ix, iz, speed, dt, rig) {
   if (l > 0.05) {
     ix /= l; iz /= l; c.a = Math.atan2(ix, iz);
     const px = c.x, pz = c.z, nx = c.x + ix * speed * dt, nz = c.z + iz * speed * dt;
-    if (!(where === 'world' && traffic.blocks(nx, nz, 0.35))) { c.x = nx; c.z = nz; }
+    // traffic blocks walking into a car, but never walking away from one (a car that stopped against you can't trap you)
+    const tb = where === 'world' ? traffic.blocks(nx, nz, 0.35) : null;
+    const away = tb && Math.hypot(nx - tb.m.position.x, nz - tb.m.position.z) > Math.hypot(c.x - tb.m.position.x, c.z - tb.m.position.z);
+    if (!tb || away) { c.x = nx; c.z = nz; }
     collide(c, 0.38);
     if (where === 'world' && !D.inBounds(c.x, c.z)) { c.x = px; c.z = pz; }
     c.walk += dt * (speed > 3 ? 10 : 7);
@@ -691,4 +694,4 @@ try { const stored = localStorage.getItem('mvp_graphics_quality'); if (['perform
 applyQuality(preferredQuality);
 refreshHud(); $('#loading').hidden = true; if (DEMO) { demoStarted = true; update(0); demoTitle(); } frame();
 addEventListener('beforeunload', persist);
-window.__world = { SC, set debugCam(v) { debugCam = v; }, probe() { const r = renderer, out = {}; r.info.autoReset = false; const count = (k, f) => { r.info.reset(); f(); out[k] = r.info.render.calls; }; count('main', () => r.render(world, camera)); count('reflect', () => wet.render(renderer, world, camera)); const by = {}; world.traverse(o => { if (o.isMesh || o.isSprite || o.isPoints) { let p = o; while (p.parent && p.parent !== world) p = p.parent; const k = (p.name || p.type) + ':' + (o.isSprite ? 'sprite' : o.isInstancedMesh ? 'inst' : 'mesh'); by[k] = (by[k] || 0) + (Array.isArray(o.material) ? o.material.length : 1); } }); out.by = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 14); r.info.autoReset = true; return out; }, renderFrame() { if (where === 'world') wet.render(renderer, world, camera); composer.render(); }, P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update };
+window.__world = { SC, traffic, set debugCam(v) { debugCam = v; }, probe() { const r = renderer, out = {}; r.info.autoReset = false; const count = (k, f) => { r.info.reset(); f(); out[k] = r.info.render.calls; }; count('main', () => r.render(world, camera)); count('reflect', () => wet.render(renderer, world, camera)); const by = {}; world.traverse(o => { if (o.isMesh || o.isSprite || o.isPoints) { let p = o; while (p.parent && p.parent !== world) p = p.parent; const k = (p.name || p.type) + ':' + (o.isSprite ? 'sprite' : o.isInstancedMesh ? 'inst' : 'mesh'); by[k] = (by[k] || 0) + (Array.isArray(o.material) ? o.material.length : 1); } }); out.by = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 14); r.info.autoReset = true; return out; }, renderFrame() { if (where === 'world') wet.render(renderer, world, camera); composer.render(); }, P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update };

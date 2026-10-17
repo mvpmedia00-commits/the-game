@@ -28,6 +28,7 @@ export class PlayerCar {
     this.v = clamp(this.v, -9, maxSpeed);
     this.steer += (r - this.steer) * Math.min(1, dt * 6);
     const turn = this.steer * (brake ? 2.6 : 1.9) * clamp(this.v / 7, -1, 1) * (1 - Math.min(0.45, Math.abs(this.v) / 80));
+    const px0 = this.x, pz0 = this.z;
     const na = this.a - turn * dt, nx = this.x + Math.sin(na) * this.v * dt, nz = this.z + Math.cos(na) * this.v * dt;
     this.bump = Math.max(0, this.bump - dt);
     let hit = 0;
@@ -35,8 +36,14 @@ export class PlayerCar {
     else if (!this.blocked(nx, this.z, na, D)) { this.x = nx; this.a = na; this.v *= 0.94; }
     else if (!this.blocked(this.x, nz, na, D)) { this.z = nz; this.a = na; this.v *= 0.94; }
     else { hit = Math.abs(this.v); this.v *= -0.25; }
-    const other = traffic && traffic.hit(this.x + Math.sin(this.a) * 1.6, this.z + Math.cos(this.a) * 1.6, 1.1);
-    if (other) { hit = Math.max(hit, Math.abs(this.v)); this.v *= 0.35; }
+    // traffic: only the bumper in the direction of travel collides, and a hit puts you back where you were with a
+    // small bounce, so you can always back away or steer round (no more sticking to a car you touched)
+    const dir = this.v >= 0 ? 1 : -1;
+    const other = traffic && Math.abs(this.v) > 0.05 && traffic.blocks(this.x + Math.sin(this.a) * 1.6 * dir, this.z + Math.cos(this.a) * 1.6 * dir, 1.1);
+    if (other) {
+      hit = Math.max(hit, Math.abs(this.v)); this.x = px0; this.z = pz0; this.v *= -0.25; // keep the new heading: you can steer off it
+      if (hit > 3) { other.stun = 1.5; other.v = 0; } // a real crash stops the other car; a nudge doesn't, so it drives off and frees you
+    }
     this.place();
     for (const w of this.m.userData.wheels) w.rotation.z -= this.v * dt / 0.36;
     if (this.m.userData.wheels) { this.m.userData.wheels[0].rotation.y = this.m.userData.wheels[1].rotation.y = this.steer * 0.45; }
