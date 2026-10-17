@@ -417,6 +417,20 @@ The world game still uses the code-built characters; swapping the real models in
 - **File names:** `tools/voice-lines.mjs` writes `assets/voices/LINES.md`, listing every line with its file name. The file name is the speaker plus a hash of the exact text. See `assets/voices/README.md`.
 - **Calls:** story missions given by phone ring by themselves (`incomingCall`). Answer plays the call; Decline leaves a "Call back" button in the PHONE menu. The Answer tap also unlocks audio and speech on phones.
 
+## 12h. Installable app (PWA)
+
+- **Files:**
+  - `manifest.webmanifest`: name, icons in `assets/icons/`, fullscreen landscape, opens `world/`.
+  - `sw.js`: the service worker, at the site root.
+  - `assets/pwa.js`: registers the service worker and handles the install prompt. It's loaded on the landing page, the game and the HD demo.
+- **Installing:** Chrome or Edge on Android and desktop offers Install. The landing page shows a 📲 button and the PHONE menu shows "Install as an app" whenever the browser allows it. On iPhone it's Share → Add to Home Screen.
+- **Caching:**
+  - Pages and code: network first, so players get updates when online and the cached copy offline.
+  - Models, textures, fonts, three.js and voice files: cached after the first load.
+  - Videos aren't cached, so offline the intro is skipped.
+  - **When you replace a model, texture or voice file in place, bump `VERSION` in `sw.js`**; otherwise installed players keep the old copy.
+- Needs HTTPS (GitHub Pages is fine). The Claude artifact copy can't be installed.
+
 ## 13. Testing and debugging
 
 - `window.__world` in the browser console exposes the game state: `__world.save` (edit cash, story, etc.), `__world.startMission(__world.STORY[3], 'story')`, `__world.enter('club')`, `__world.update(0.033)` to step one frame (`__world.tick(dt)` also clears key presses, for scripted tests).

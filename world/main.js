@@ -516,6 +516,7 @@ function openPhone() {
     ...(where !== 'world' ? [['Step outside to Las Vegas Blvd', () => { closePanel(); enter('world', where); }, { plain: true }]] : []),
     ['Save game', () => { persist(); toast('Saved.'); }, { plain: true }],
     ['Start a new game', confirmNewGame, { plain: true }],
+    ...(window.mvpCanInstall ? [['📲 Install as an app', () => { closePanel(); window.mvpInstall(); }, { plain: true, small: 'Home-screen icon, fullscreen, faster loading' }]] : []),
     [`Music: ${soundPrefs.music ? 'On' : 'Off'}`, () => { setSound('music', !soundPrefs.music); closePanel(); openPhone(); }, { plain: true }],
     [`Voices: ${soundPrefs.voices ? 'On' : 'Off'}`, () => { setSound('voices', !soundPrefs.voices); closePanel(); openPhone(); }, { plain: true }],
     ['Close', closePanel, { plain: true }],
