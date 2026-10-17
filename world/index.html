@@ -104,6 +104,7 @@ body.touch #carbtn { display: block; } body.touch.driving #brakebtn { display: b
 } }
 </script>
 <script src="../assets/agegate.js"></script>
+<script src="../assets/intro.js" data-src="../assets/video/intro.mp4"></script>
 </head>
 <body>
 <canvas id="view" aria-label="Las Vegas street, third-person view"></canvas>
@@ -130,8 +131,10 @@ body.touch #carbtn { display: block; } body.touch.driving #brakebtn { display: b
 <button id="quality" aria-label="Cycle graphics quality: performance, balanced, cinematic">BALANCED</button>
 <div id="demo-guide" hidden role="status"></div>
 <div id="loading">MVP MEDIA · LAS VEGAS — THE UNDERGROUND CUT</div>
+<link rel="modulepreload" href="./main.js?v=velvet-block-3">
 <script type="module">
-import('./main.js?v=velvet-block-3').catch(error => {
+// build the city after the intro video, so the video plays smoothly (the modules are already downloading)
+(window.mvpIntroDone || Promise.resolve()).then(() => import('./main.js?v=velvet-block-3')).catch(error => {
   console.error(error);
   const loading = document.getElementById('loading');
   loading.hidden = false;

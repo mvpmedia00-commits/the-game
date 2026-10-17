@@ -18,7 +18,7 @@
       '<button id="agegate-no" style="padding:12px 22px;border-radius:999px;border:1px solid rgba(255,255,255,.25);background:transparent;color:#f6f1eb;font:700 14px Montserrat,system-ui,sans-serif;cursor:pointer">I\'m under 18</button></div></div>';
     document.body.appendChild(d);
     document.getElementById('agegate-yes').focus();
-    document.getElementById('agegate-yes').onclick = function () { try { localStorage.setItem(KEY, '1'); } catch (e) {} window.mvpAgeOk = true; d.remove(); };
+    document.getElementById('agegate-yes').onclick = function () { try { localStorage.setItem(KEY, '1'); } catch (e) {} window.mvpAgeOk = true; d.remove(); window.dispatchEvent(new Event('mvp-age-ok')); };
     document.getElementById('agegate-no').onclick = function () { d.firstChild.innerHTML = '<h1 style="font:900 24px Cinzel,Georgia,serif">Sorry, this game is for adults only.</h1><p style="color:#b1a8ae">Come back when you\'re 18.</p>'; };
   }
   if (document.body) show(); else document.addEventListener('DOMContentLoaded', show);
