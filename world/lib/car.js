@@ -70,7 +70,8 @@ export class Chaser {
     this.from = 'C'; this.to = options[0];
   }
   update(dt, player, traffic) {
-    if (this.hp <= 0) { this.v *= 0.94; } else this.v += (this.speed - this.v) * Math.min(1, dt * 1.5);
+    // hold = engine running at the kerb until the player is in a car; then it floors it
+    if (this.hp <= 0) { this.v *= 0.94; } else this.v += ((this.hold ? 0 : this.speed) - this.v) * Math.min(1, dt * (this.hold ? 4 : 1.5));
     const { ox, oz } = this.lane(this.from, this.to), tx = NODES[this.to][0] + ox, tz = NODES[this.to][1] + oz;
     const dx = tx - this.x, dz = tz - this.z, d = Math.hypot(dx, dz);
     if (d < 6 && this.hp > 0) this.pickNext(player);
