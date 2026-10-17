@@ -389,6 +389,8 @@ function enter(name, from) {
     springs.joints.forEach(j => j.init = false); snapCam = true;
     const st = step(); if (st && st.t === 'enter' && st.scene === name) nextStep();
     f.classList.remove('on'); refreshHud();
+    const now = step(); if (name !== 'world' && !(now && now.scene === name)) // nothing to do in here right now: say where the story is
+      setTimeout(() => toast(`${name === 'club' ? "Ruby's set is on, but there's no job in here right now." : 'No shoot booked in here right now.'} Next: ${$('#objective').textContent}`), 600);
   }, 380);
 }
 
