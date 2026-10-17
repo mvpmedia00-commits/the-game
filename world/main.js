@@ -152,7 +152,7 @@ loadCharacter('../assets/characters/ruby.glb', { name: 'Ruby', height: 1.68, arm
 }).catch(e => console.warn('Ruby model unavailable, using the code-built Ruby', e));
 loadCharacter('../assets/characters/mvp.glb', { name: 'MVP', height: 1.85 }).then(rig => {
   if (!rig) return;
-  rig.prop = C.makeDSLR(); rig.propMode = 'both'; rig.hold = true; rig.root.add(rig.prop); // camera in both hands
+  rig.prop = C.makeDSLR(); rig.propMode = 'both'; rig.hold = false; rig.root.add(rig.prop); // natural arm swing when walking; camera raised when standing
   adoptRig(mvp, rig); for (const k of Object.keys(mvp)) delete mvp[k]; Object.assign(mvp, rig); // same object: every mvp.* reference keeps working
 }).catch(e => console.warn('MVP model unavailable, using the code-built MVP', e));
 let freeModel = null; // freelance model for gigs
@@ -253,7 +253,25 @@ let chaser = null;
 function spawnChaser(st) {
   const m = carModel(st.color); world.add(m);
   chaser = new Chaser(m, { hp: st.hp, speed: st.speed, x: st.spawn.x, z: st.spawn.z, from: st.spawn.from, to: st.spawn.to });
-  act.lost = 0; if (!driving) toast('Get in your car (F) and chase them down!');
+  // a glowing marker rides above the target so it can be found at night from anywhere
+  const mark = new THREE.Group(); mark.position.set(0, 3.4, 0); m.add(mark); m.userData.marker = mark;
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.1, 4), new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 0.35, 0.35), depthTest: false, transparent: true }));
+  cone.rotation.x = Math.PI; cone.renderOrder = 20; mark.add(cone);
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: C.glowTex, color: new THREE.Color(2.2, 0.3, 0.3), blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, transparent: true }));
+  halo.scale.setScalar(3.2); halo.renderOrder = 19; mark.add(halo);
+  act.lost = 0;
+  if (!driving) {
+    if (Math.hypot(car.x - P.x, car.z - P.z) > 25) parkCarNear(P.x, P.z);
+    toast(Math.hypot(car.x - P.x, car.z - P.z) < 25 ? 'Your car is at the kerb. Get in (F) and chase them down!' : 'Get in your car (F) and chase them down!');
+  }
+}
+// Put MVP's car at the nearest kerb (boulevard or Fremont) beside a point, avoiding parked cars and traffic.
+function parkCarNear(x, z) {
+  const tries = [];
+  if (Math.abs(x) < 40) for (const dz of [0, 6, -6, 12, -12, 18]) tries.push([x < 0 ? -7.6 : 7.6, z + dz, x < 0 ? 0 : Math.PI]);
+  if (Math.abs(z) < 40) for (const dx of [0, 6, -6, 12, -12]) tries.push([x + dx, z < 0 ? -6.2 : 6.2, z < 0 ? -Math.PI / 2 : Math.PI / 2]);
+  for (const [cx, cz, a] of tries) if (D.inBounds(cx, cz) && !car.blocked(cx, cz, a, D) && !traffic.blocks(cx, cz, 2)) { car.x = cx; car.z = cz; car.a = a; car.v = 0; car.place(); return true; }
+  return false;
 }
 function removeChaser() { if (chaser) { world.remove(chaser.m); chaser = null; } $('#hpbar').hidden = true; }
 function updMission(dt) {
@@ -261,11 +279,13 @@ function updMission(dt) {
   if (act.timer != null) { act.timer -= dt; if (act.timer <= 0) return failMission('You ran out of time.'); }
   if (st.t === 'goto' && where === 'world') { const s = SPOTS()[st.to]; const me = driving ? car : P; if (Math.hypot(me.x - s.x, me.z - s.z) < (s.r || 3) + (driving ? 3 : 0)) nextStep(); return; }
   if (st.t === 'chase' && chaser && where === 'world') {
+    chaser.hold = !driving; // waits at the kerb until you're behind the wheel
     chaser.update(dt, driving ? car : P, traffic);
+    if (chaser.m.userData.marker) { const mk = chaser.m.userData.marker; mk.position.y = 3.4 + Math.sin(T * 4) * 0.25; mk.rotation.y += dt * 2; }
     if (driving) { const dmg = chaser.ram(car); if (dmg) { sfx('bump'); shake = 0.45; toast(`Rammed · -${dmg}`); } }
     $('#hpbar').hidden = false; $('#hpname').textContent = act.m.id === 'bootleg' ? 'Bootleg van' : act.m.id === 'finale' ? 'Silas Crane' : 'Neon Kings coupe'; $('#hpfill').style.transform = `scaleX(${Math.max(0, chaser.hp / chaser.maxHp)})`;
     if (chaser.hp <= 0 && Math.abs(chaser.v) < 2) { toast('Got them!'); sfx('cash'); nextStep(); return; }
-    const me = driving ? car : P; if (Math.hypot(me.x - chaser.x, me.z - chaser.z) > 230) { act.lost += dt; if (act.lost > 8) return failMission('They got away.'); } else act.lost = 0;
+    const me = driving ? car : P; if (driving && Math.hypot(me.x - chaser.x, me.z - chaser.z) > 230) { act.lost += dt; if (act.lost > 8) return failMission('They got away.'); } else act.lost = 0;
   }
 }
 
@@ -580,6 +600,7 @@ function update(dt) {
     const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), run = keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(stick.f, stick.r) > 0.92;
     moveChar(P, fx * f - fz * r, fz * f + fx * r, run ? 5.6 : 2.3, dt, mvp);
     if (P.move <= 0.05) C.setPose(mvp, Object.assign({ sp: [0.02 + Math.sin(T * 1.6) * 0.015, 0, 0] }, C.HOLD), Math.min(1, dt * 8));
+    if (mvp.retarget) mvp.propMode = P.move > 0.05 ? 'R' : 'both'; // walking: camera carried in the right hand; standing: held up in both
     if (mvp.apply) mvp.apply(); // model rig: copy the pose onto the bones before the camera finds the hands
     C.updProps(mvp);
   }
@@ -627,7 +648,7 @@ function update(dt) {
     $('#demo-guide').textContent = save.story >= 1 ? 'Assignment complete · explore the district or replay from PHONE' : where === 'club' ? 'Frame Ruby with her head and feet visible. Press P or SHOOT. Take 4 photos.' : `Follow the gold beacon${distance} · E / ACT to enter · Shift to run`;
   }
   const tgt = objectiveTarget(), st = step();
-  beacon.visible = !!tgt && !(st && st.t === 'chase'); if (tgt) beacon.position.set(tgt.x, 0, tgt.z);
+  beacon.visible = !!tgt; if (tgt) beacon.position.set(tgt.x, 0, tgt.z);
   drawMap(tgt);
   if (act && act.timer != null) { $('#timer').hidden = false; $('#timer').textContent = Math.ceil(act.timer) + 's'; } else $('#timer').hidden = true;
   $('#grid').hidden = !(st && st.t === 'shoot' && st.scene === where);
