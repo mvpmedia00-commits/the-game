@@ -442,6 +442,12 @@ function startGig(g) {
   freeModel = { id: 'free', rig, poseT: 0, pose: 0, place: null, fixed: { scene: 'world', x: s.x + (g.at === 'carpet' ? 0 : 1.2), z: s.z, ry: g.at === 'carpet' ? Math.PI / 2 : g.at === 'poolspot' ? Math.PI : -Math.PI / 2, pose: 'pose' } };
   gigs = gigs.filter(x => x !== g); closePanel(); startMission(g, 'gig');
 }
+// wipe the save (after a confirm) and reload from the motel
+function confirmNewGame() {
+  panelCard('New game', 'Start over?', '<p>This erases your money, story progress, studio, talent and films. It can\'t be undone.</p>',
+    [['Yes, start over', () => { removeEventListener('beforeunload', persist); try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); }], ['Cancel', () => { closePanel(); openPhone(); }, { plain: true }]]);
+  panel.dataset.dismissible = 'true';
+}
 function openPhone() {
   if (DEMO && (!demoStarted || dialog)) return;
   if (DEMO) return openDemoMenu();
@@ -457,6 +463,7 @@ function openPhone() {
     ['Studio productions', openStudio, { plain: true, small: save.studio ? (where === 'studio' ? '' : 'Go inside MVP Studios') : 'Buy the studio first' }],
     ...(where !== 'world' ? [['Step outside to Las Vegas Blvd', () => { closePanel(); enter('world', where); }, { plain: true }]] : []),
     ['Save game', () => { persist(); toast('Saved.'); }, { plain: true }],
+    ['Start a new game', confirmNewGame, { plain: true }],
     [`Music: ${soundPrefs.music ? 'On' : 'Off'}`, () => { setSound('music', !soundPrefs.music); closePanel(); openPhone(); }, { plain: true }],
     [`Voices: ${soundPrefs.voices ? 'On' : 'Off'}`, () => { setSound('voices', !soundPrefs.voices); closePanel(); openPhone(); }, { plain: true }],
     ['Close', closePanel, { plain: true }],

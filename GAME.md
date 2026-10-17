@@ -234,6 +234,7 @@ Productions are about the business: casting, sets, lighting, mood, camera and th
 | Zoom / viewfinder (during a shoot) | Z / X or mouse wheel | + / − |
 | Phone menu | Tab or M | PHONE |
 | Pause | Esc | II PAUSE |
+| Start over (new game) | Phone → Start a new game | PHONE → Start a new game |
 
 ---
 
