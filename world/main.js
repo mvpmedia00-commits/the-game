@@ -15,6 +15,7 @@ import * as C from '../hd-demo/lib/characters.js';
 import { buildStudio } from '../hd-demo/lib/studio.js';
 import { SpringSystem } from '../hd-demo/lib/springs.js';
 import { loadCharacter } from '../hd-demo/lib/glbchar.js';
+import { Music, Voices } from './lib/audio.js';
 import { buildDistrict } from './lib/district.js?v=block-3';
 import { Traffic, Pedestrians, carModel } from './lib/npcs.js';
 import { buildClub } from './lib/club.js?v=block-3';
@@ -52,11 +53,16 @@ const gradePass = new ShaderPass(CinemaGrade); composer.addPass(gradePass);
 composer.addPass(new OutputPass());
 
 // ---------- audio (synth, starts on first input)
-let AC = null, master = null, engine = null;
+let AC = null, master = null, engine = null, music = null;
+// sound settings (phone menu): background music and spoken dialogue
+const soundPrefs = (() => { try { return Object.assign({ music: true, voices: true }, JSON.parse(localStorage.getItem('mvp_sound') || '{}')); } catch (e) { return { music: true, voices: true }; } })();
+const voices = new Voices(); voices.on = soundPrefs.voices;
+function setSound(k, v) { soundPrefs[k] = v; try { localStorage.setItem('mvp_sound', JSON.stringify(soundPrefs)); } catch (e) {} if (k === 'music' && music) music.setOn(v); if (k === 'voices') { voices.on = v; if (!v) voices.stop(); } }
 function initAudio() {
   if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   try { AC = new (window.AudioContext || window.webkitAudioContext)(); master = AC.createGain(); master.gain.value = 0.45; master.connect(AC.destination);
     const o = AC.createOscillator(), f = AC.createBiquadFilter(), g = AC.createGain(); o.type = 'sawtooth'; o.frequency.value = 40; f.type = 'lowpass'; f.frequency.value = 380; g.gain.value = 0; o.connect(f); f.connect(g); g.connect(master); o.start(); engine = { o, g };
+    music = new Music(AC, master); music.setOn(soundPrefs.music);
   } catch (e) { AC = null; }
 }
 function tone(f, d, type = 'sine', v = 0.1, slide = 0, delay = 0) { if (!AC) return; const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain(); o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f + slide), t + d); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + d); o.connect(g); g.connect(master); o.start(t); o.stop(t + d + 0.02); }
@@ -376,8 +382,9 @@ for (const ev of ['pointerdown', 'pointerup', 'pointercancel']) $('#brakebtn').a
 // ---------- UI
 let dialog = null;
 function talk(lines, done) { if (!lines.length) { done && done(); return; } dialog = { lines, i: 0, done }; showLine(); }
-function showLine() { const [who, text] = dialog.lines[dialog.i]; $('#dlg-who').textContent = who; $('#dlg-text').textContent = text; $('#dialog').hidden = false; }
-function advance() { sfx('click'); dialog.i++; if (dialog.i >= dialog.lines.length) { const d = dialog.done; dialog = null; $('#dialog').hidden = true; d && d(); } else showLine(); }
+function showLine() { const [who, text] = dialog.lines[dialog.i]; $('#dlg-who').textContent = who; $('#dlg-text').textContent = text; $('#dialog').hidden = false;
+  voices.say(who, text, () => music && music.setDuck(0.3), () => music && music.setDuck(1)); } // read the line aloud, music ducks under it
+function advance() { sfx('click'); voices.stop(); dialog.i++; if (dialog.i >= dialog.lines.length) { if (music) music.setDuck(1); const d = dialog.done; dialog = null; $('#dialog').hidden = true; d && d(); } else showLine(); }
 $('#dialog').addEventListener('click', () => dialog && advance());
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 3400); }
 const panel = $('#panel'); let panelActs = [];
@@ -424,6 +431,8 @@ function openPhone() {
     ['Studio productions', openStudio, { plain: true, small: save.studio ? (where === 'studio' ? '' : 'Go inside MVP Studios') : 'Buy the studio first' }],
     ...(where !== 'world' ? [['Step outside to Las Vegas Blvd', () => { closePanel(); enter('world', where); }, { plain: true }]] : []),
     ['Save game', () => { persist(); toast('Saved.'); }, { plain: true }],
+    [`Music: ${soundPrefs.music ? 'On' : 'Off'}`, () => { setSound('music', !soundPrefs.music); closePanel(); openPhone(); }, { plain: true }],
+    [`Voices: ${soundPrefs.voices ? 'On' : 'Off'}`, () => { setSound('voices', !soundPrefs.voices); closePanel(); openPhone(); }, { plain: true }],
     ['Close', closePanel, { plain: true }],
   ]);
 }
@@ -605,6 +614,7 @@ function update(dt) {
     C.updProps(mvp);
   }
   updateNPCs(dt, T);
+  if (music) { const s0 = step(); music.setMood(where === 'club' ? 'club' : where === 'studio' ? 'studio' : s0 && s0.t === 'chase' ? 'chase' : 'street'); }
   if (!blocked) updMission(dt);
   if (where === 'world') {
     traffic.update(dt, driving ? { x: 999, z: 999 } : P, [car, ...(chaser ? [chaser] : [])]); peds.update(dt, P, driving ? car : null); D.update(T, P);
@@ -699,7 +709,7 @@ function openDemoMenu() {
   if (!panel.hidden) return closePanel();
   panelCard('MVP PHONE · DEMO', 'Tonight’s assignment',
     `<p>${esc(save.story >= 1 ? 'Velvet Hours complete. The district is yours to explore.' : step()?.text || 'Meet Ruby at The Velvet Room.')}</p><p class="muted">Move: WASD / left thumb. Look: mouse / right thumb. E / ACT: interact. P / SHOOT: photo. F / CAR: drive. Graphics: tap the quality label.</p>`,
-    [['Resume', closePanel], ...(where !== 'world' ? [['Step outside to Las Vegas Blvd', () => { closePanel(); enter('world', where); }, { plain: true }]] : []), ['Replay from the beginning', () => beginDemo(true), { plain: true }], ['Save progress', () => { persist(); closePanel(); toast('Demo progress saved.'); }, { plain: true }]]);
+    [['Resume', closePanel], ...(where !== 'world' ? [['Step outside to Las Vegas Blvd', () => { closePanel(); enter('world', where); }, { plain: true }]] : []), ['Replay from the beginning', () => beginDemo(true), { plain: true }], ['Save progress', () => { persist(); closePanel(); toast('Demo progress saved.'); }, { plain: true }], [`Music: ${soundPrefs.music ? 'On' : 'Off'}`, () => { setSound('music', !soundPrefs.music); closePanel(); openDemoMenu(); }, { plain: true }], [`Voices: ${soundPrefs.voices ? 'On' : 'Off'}`, () => { setSound('voices', !soundPrefs.voices); closePanel(); openDemoMenu(); }, { plain: true }]]);
   panel.dataset.dismissible = 'true';
 }
 let contextLost = false;
