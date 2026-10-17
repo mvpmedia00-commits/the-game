@@ -12,6 +12,7 @@ import * as C from './lib/characters.js';
 import { buildStudio } from './lib/studio.js';
 import { buildPool } from './lib/pool.js';
 import { SpringSystem } from './lib/springs.js';
+import { mixamoRig } from './lib/retarget.js';
 
 const $ = s => document.querySelector(s);
 const canvas = $('#view');
@@ -59,12 +60,18 @@ function useStandIn(s) {
   s.found = {}; for (const sp of rig.springs) s.found[sp.kind] = (s.found[sp.kind] || 0) + 1;
   refreshUI();
 }
-// Bounds from the stored (bind-pose) geometry: Box3.setFromObject would skin rigged meshes with bones that
-// haven't been updated yet and report a wrong size. Rigged meshes also skip frustum culling (they move).
+// Bounds of the model as it stands: rigged meshes are measured after updating their skeleton (Box3.setFromObject
+// would skin them with stale bone matrices). Rigged meshes also skip frustum culling (they move).
 function restBox(root) {
   root.updateMatrixWorld(true);
   const box = new THREE.Box3(), b = new THREE.Box3();
-  root.traverse(o => { if (!o.isMesh) return; if (o.isSkinnedMesh) o.frustumCulled = false; if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); box.union(b.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld)); });
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    if (o.isSkinnedMesh) { // measure through the skeleton: compressed (quantized) skins store positions in a packed space
+      o.frustumCulled = false; o.skeleton.update(); o.computeBoundingBox(); box.union(b.copy(o.boundingBox).applyMatrix4(o.matrixWorld)); return;
+    }
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); box.union(b.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld));
+  });
   return box;
 }
 const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
@@ -72,6 +79,7 @@ function useGLTF(s, gltf, name) {
   clearSlot(s);
   const root = gltf.scene;
   root.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; if (o.material && o.material.isMeshStandardMaterial) o.material.envMapIntensity = 1; } });
+  const mixamo = mixamoRig(root); // Mixamo skeletons (Tripo, Mixamo, ActorCore) get the game's poses too; also turns the model to face +z
   // fit to the slot's height, feet on the floor, centred
   const box = restBox(root), size = box.getSize(new THREE.Vector3());
   const k = s.height / Math.max(0.01, size.y); root.scale.setScalar(k);
@@ -81,7 +89,8 @@ function useGLTF(s, gltf, name) {
   s.found = s.springs.scan(root);
   // models rigged with the game's joint names (tools/autorig) are driven by the same poses, walk and dance as the stand-ins
   const B = {}; root.traverse(o => { if (o.isBone) B[o.name] = o; });
-  if (RIG_JOINTS.every(k => B[k])) { s.rig = { root }; for (const k of RIG_JOINTS) s.rig[k] = B[k]; s.rig.cur = null; s.rig.bobNode = B.hips; s.rig.bobScale = 1 / s.height; }
+  if (mixamo) s.rig = mixamo;
+  else if (RIG_JOINTS.every(k => B[k])) { s.rig = { root }; for (const k of RIG_JOINTS) s.rig[k] = B[k]; s.rig.cur = null; s.rig.bobNode = B.hips; s.rig.bobScale = 1 / s.height; }
   s.clips = gltf.animations || [];
   s.animated = new Set(s.clips.flatMap(c => c.tracks.map(tr => tr.name.split('.')[0])));
   if (s.clips.length) { s.mixer = new THREE.AnimationMixer(root); s.action = s.mixer.clipAction(s.clips[0]); s.action.play(); s.clipIndex = 0; }
@@ -116,6 +125,7 @@ function animate(s, t, dt) {
     else { const list = [C.RUBY_A, C.POSES[1], C.RUBY_B, C.POSES[3], C.POSES[5], C.POSES[2]]; C.setPose(r, list[Math.floor(t / 3.2) % list.length], Math.min(1, dt * 3)); }
   }
   if (r.prop) C.updProps(r);
+  if (r.apply) r.apply(); // retargeted rigs: copy the pose onto the model's bones
 }
 
 // ---------- UI
