@@ -17,8 +17,10 @@ MVP Media's games, playable in the browser. No build step. **Read [GAME.md](GAME
 
 ## Play it online (GitHub Pages)
 
-Settings → Pages → Source: **Deploy from a branch** → Branch: `main`, folder `/ (root)` → Save.
-After a minute the games are live at `https://mvpmedia00-commits.github.io/the-game/`.
+Pages is off until you turn it on (one time): **Settings → Pages → Source: Deploy from a branch → Branch: `main`, folder `/ (root)` → Save**.
+After a minute or two the game is live at `https://mvpmedia00-commits.github.io/the-game/`, with no login needed.
+
+The game runs fully offline: three.js and the fonts are bundled in `vendor/`.
 
 ## Run it locally
 

@@ -5,9 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>MVP Media HD Demo</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;900&family=Montserrat:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../vendor/fonts/fonts.css">
 <style>
 /* Layout: full-bleed WebGL viewport; glass control panel docked right (bottom sheet on phones); shutter + photo strip bottom-left. Single dark studio look by design. */
 :root {
@@ -74,10 +72,11 @@ body.drag::after { content: "Drop your .glb character"; position: fixed; inset: 
 </style>
 <script type="importmap">
 { "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  "three": "../vendor/three/build/three.module.min.js",
+  "three/addons/": "../vendor/three/examples/jsm/"
 } }
 </script>
+<script src="../assets/agegate.js"></script>
 </head>
 <body>
 <canvas id="view" aria-label="3D character viewer"></canvas>

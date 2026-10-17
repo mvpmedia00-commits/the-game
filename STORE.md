@@ -1,4 +1,4 @@
-# MVP Media: Las Vegas — The Underground Cut (Explicit)
+# MVP Media: Las Vegas — The Underground Cut (Adults Only, 18+)
 
 *Own the frame. Then own the film.*
 
@@ -35,9 +35,9 @@ Every performer is a named adult professional with a paid day rate. That's the o
 
 ---
 
-## The explicit part
+## The adult part
 
-Here's where the gloves come off. The game doesn't hide what the business *is* — it just doesn't stop to explain it.
+Here's where the gloves come off. The game doesn't hide what the business *is* — it just doesn't stop to explain it. Adult in its themes, language and attitude, not in what's on screen: no nudity or sex scenes, and productions cut to "That's a wrap."
 
 **The roster is your stable of performers.** These aren't models who happen to do films. They're working adult talent with bodies, personalities and appetites, and the game treats them like it. Ruby's a headliner who knows exactly what she's worth and makes you earn the shot. Nova wants covers and knows the camera loves her body. Jade's a five-star veteran who's seen every set, every ego, every bullshit move — and runs hers like a general. Coco works burlesque and brings that tease to everything. Lex runs her own company and signs *only* with people who don't waste her time.
 
@@ -45,7 +45,7 @@ Here's where the gloves come off. The game doesn't hide what the business *is* �
 
 **The sets are the fantasy.** Stage A with the cyclorama and softboxes is your bread and butter. The Desert Rose pool at night is glossy, wet, warm — Nova's dream. The Velvet Room after hours is red velvet and neon, all drama and shadow. The Crown penthouse is money, glass, skyline. Each one is a *look*, and the look is the product.
 
-**The money is real.** Opening sales are quality × (25 + rep) × 2.2, and then **8% of that lands in your account every single day after**. Stack films, stack royalties, stack rep, and you go from counting hundreds to counting thousands without lifting the camera. That's the whole arc: stop renting your talent out to other people's productions and start owning the catalog.
+**The money is real.** Opening sales are quality × (25 + rep) × 0.72, and then **5% of that lands in your account every single day after**. Stack films, stack royalties, stack rep, and the catalog slowly turns into a living, but gigs, gear and the street still pay the bills on the way up. That's the whole arc: stop renting your talent out to other people's productions and start owning the catalog.
 
 **The rival is a pirate.** Silas Crane and the Neon Kings steal your masters and sell your films behind your back. The back half of the story is a turf war over *who owns the work* — the most real tension in any creative business, adult or otherwise.
 
@@ -62,6 +62,6 @@ Here's where the gloves come off. The game doesn't hide what the business *is* �
 
 ## The tone
 
-Mature, explicit in *attitude* if not in pixels — but the industry is texture, not homework. MVP red and gold against neon pink, teal and amber. Bloom on every sign, softbox glow on a cyclorama, wet asphalt reflecting the whole damn city. *Boogie Nights* energy, business-sim spine, shot through a DSLR.
+Mature, adult in *attitude*, never explicit in pixels — but the industry is texture, not homework. MVP red and gold against neon pink, teal and amber. Bloom on every sign, softbox glow on a cyclorama, wet asphalt reflecting the whole damn city. *Boogie Nights* energy, business-sim spine, shot through a DSLR.
 
 You're not playing a performer. You're playing the guy behind the camera who realized the camera was the way in — and built an empire out of it.

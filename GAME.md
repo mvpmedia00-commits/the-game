@@ -200,8 +200,8 @@ You can make **one per in-game day**, inside MVP Studios.
    - Premium ($2,000, ×1.35)
 4. **Director's calls:** choose the lighting, mood and camera. Matching a performer's taste in lighting and mood earns +7 each.
 5. **Wrap:** quality comes out of 100.
-   - Opening sales = quality × (25 + rep) × 2.2.
-   - **Royalties** of 8% of opening sales arrive every day after.
+   - Opening sales = quality × (25 + rep) × 0.72.
+   - **Royalties** of 5% of opening sales arrive every day after.
 
 Productions are about the business: casting, sets, lighting, mood, camera and the box office. Scenes end at "Cut! That's a wrap." Each set is a look, and the look is the product.
 
@@ -231,7 +231,9 @@ Productions are about the business: casting, sets, lighting, mood, camera and th
 | Get in or out of the car | F | CAR |
 | Handbrake | Space | BRAKE (while driving) |
 | Take a photo | P | SHOOT |
+| Zoom / viewfinder (during a shoot) | Z / X or mouse wheel | + / − |
 | Phone menu | Tab or M | PHONE |
+| Pause | Esc | II PAUSE |
 
 ---
 

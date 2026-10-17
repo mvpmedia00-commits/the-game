@@ -131,7 +131,9 @@ const SAVE_KEY = DEMO ? 'mvp_velvet_demo_v1' : 'mvp_world_v2';
 const fresh = () => ({ cash: 250, rep: 0, story: 0, studio: false, roster: [], gear: { stab: 0, lens: 0, light: 0, ride: 0 }, releases: [], day: 1, minute: 23 * 60 + 40, lastProduce: 0, shots: 0, introDone: false });
 let save = fresh();
 try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s) { save = Object.assign(fresh(), s); save.gear = Object.assign(fresh().gear, s.gear || {}); } } catch (e) {}
-const persist = () => { try { save.x = P.x; save.z = P.z; localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} };
+// indoors, P holds room coordinates: save the street spot outside that building's door instead
+const outsideDoor = from => { const d = D.pois.find(p => p.id === (from === 'club' ? 'velvet' : 'studio')); return { x: d.x - 1, z: d.z + d.r + 0.8 }; };
+const persist = () => { try { const o = where === 'world' ? P : outsideDoor(where); save.x = o.x; save.z = o.z; localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} };
 const addRep = n => { save.rep = clamp(save.rep + n, 0, 100); };
 
 // ---------- characters
@@ -159,7 +161,8 @@ function adoptRig(old, next) {
 const mocapLib = loadMocap('../assets/animations/mocap.glb').catch(e => { console.warn('Motion capture unavailable', e); return null; });
 loadCharacter('../assets/characters/ruby.glb', { name: 'Ruby', height: 1.68, armPitch: -0.22 }).then(async rig => {
   if (!rig) return;
-  const lib = await mocapLib; if (lib) rig.mocap = new MocapDriver(rig, lib); // before anything moves the bones const n = NPCS.ruby; adoptRig(n.rig, rig); noReflect(rig.root); n.rig = rig;
+  const lib = await mocapLib; if (lib) rig.mocap = new MocapDriver(rig, lib); // before anything moves the bones
+  const n = NPCS.ruby; adoptRig(n.rig, rig); noReflect(rig.root); n.rig = rig;
 }).catch(e => console.warn('Ruby model unavailable, using the code-built Ruby', e));
 loadCharacter('../assets/characters/mvp.glb', { name: 'MVP', height: 1.85 }).then(async rig => {
   if (!rig) return;
@@ -318,8 +321,8 @@ function scoreShot(n) {
   if (h.z > 1 || Math.abs(h.x) > 1 || Math.abs(h.y) > 1) return null;
   const u = (h.x + 1) / 2, v = (1 - h.y) / 2;
   let d = 9; for (const [a, b] of [[1 / 3, 1 / 3], [2 / 3, 1 / 3], [1 / 3, 2 / 3], [2 / 3, 2 / 3]]) d = Math.min(d, Math.hypot(u - a, (v - b) * 0.8));
-  const comp = clamp(1 - d / 0.3, 0, 1), frac = (tp.y - ft.y) / 2, fill = frac > 1.2 ? 0.75 : frac >= 0.35 ? 1 : clamp(frac / 0.35, 0.15, 1);
-  return { score: Math.round(clamp((comp * 0.45 + fill * 0.2 + (n.peak ?? 0.6) * 0.35) * 100 + shotBonus(), 0, 100)), comp, fill, peak: n.peak ?? 0.6 };
+  const comp = clamp(1 - d / 0.3, 0, 1), frac = (tp.y - ft.y) / 2, cropped = ft.y < -1.02, fill = (frac > 1.2 ? 0.75 : frac >= 0.35 ? 1 : clamp(frac / 0.35, 0.15, 1)) * (cropped ? 0.5 : 1); // cutting off her feet costs points
+  return { score: Math.round(clamp((comp * 0.45 + fill * 0.2 + (n.peak ?? 0.6) * 0.35) * 100 + shotBonus(), 0, 100)), comp, fill, peak: n.peak ?? 0.6, u, v, cropped };
 }
 const grade = n => n >= 88 ? 'A+' : n >= 78 ? 'A' : n >= 66 ? 'B' : n >= 52 ? 'C' : 'D';
 function photo() {
@@ -330,10 +333,10 @@ function photo() {
   save.shots++;
   const targets = shootTargets(); if (!targets) return;
   let best = null; for (const n of targets) { const r = scoreShot(n); if (r && (!best || r.score > best.score)) best = r; }
-  if (!best) { toast('Missed. Get her in the frame.'); return; }
+  if (!best) { toast('Missed. Get her in the frame (follow the circle).'); return; }
   act.shots.push({ score: best.score, url });
   const st = step();
-  toast(`${grade(best.score)} · ${best.score}${best.comp < 0.3 ? ' · put her face on a thirds line' : best.peak < 0.9 ? ' · wait for the pose' : ''}  (${act.shots.length}/${st.shots})`);
+  toast(`${grade(best.score)} · ${best.score}${best.cropped ? ' · keep her feet in the frame' : best.fill < 0.75 ? ' · zoom in (Z / wheel / +)' : best.comp < 0.5 ? ' · put her face on a gold point' : best.peak < 0.9 ? ' · wait for the pose' : ''}  (${act.shots.length}/${st.shots})`);
   if (act.shots.length >= st.shots) contactSheet();
 }
 function contactSheet() {
@@ -350,7 +353,7 @@ function enter(name, from) {
     where = name; renderPass.scene = SC[name].scene; SC[name].scene.add(mvp.root);
     if (name === 'studio') { P.x = 0; P.z = 5.6; P.a = P.ry = Math.PI; cam.yaw = 0; }
     else if (name === 'club') { P.x = 0; P.z = 11.5; P.a = P.ry = Math.PI; cam.yaw = 0; cam.pitch = 0.18; }
-    else { const d = from === 'club' ? D.pois.find(p => p.id === 'velvet') : D.pois.find(p => p.id === 'studio'); P.x = d.x - 1; P.z = d.z + d.r + 0.8; P.a = P.ry = -Math.PI / 2; cam.yaw = Math.PI / 2; }
+    else { const o = outsideDoor(from); P.x = o.x; P.z = o.z; P.a = P.ry = -Math.PI / 2; cam.yaw = Math.PI / 2; }
     doorLock = performance.now() + 1000;
     springs.joints.forEach(j => j.init = false); snapCam = true;
     const st = step(); if (st && st.t === 'enter' && st.scene === name) nextStep();
@@ -367,8 +370,8 @@ function clearInput() { keys.clear(); pressed.clear(); stick.f = stick.r = 0; st
 addEventListener('blur', clearInput);
 document.addEventListener('visibilitychange', clearInput);
 canvas.addEventListener('mousedown', e => { initAudio(); if (e.button === 0 && !TOUCH && panel.hidden) { try { const r = canvas.requestPointerLock(); r && r.catch && r.catch(() => {}); } catch (err) {} } });
-document.addEventListener('pointerlockchange', () => { locked = document.pointerLockElement === canvas; });
-addEventListener('mousemove', e => { if (locked) { cam.yaw -= e.movementX * 0.0025; cam.pitch = clamp(cam.pitch + e.movementY * 0.002, -0.15, 1.1); cam.lastLook = T; } });
+document.addEventListener('pointerlockchange', () => { const was = locked; locked = document.pointerLockElement === canvas; if (was && !locked) pauseGame(); }); // Esc while the mouse is locked
+addEventListener('mousemove', e => { if (locked) { cam.yaw -= e.movementX * 0.0025 / zoom; cam.pitch = clamp(cam.pitch + e.movementY * 0.002 / zoom, -0.15, 1.1); cam.lastLook = T; } });
 const stick = { id: null, ox: 0, oy: 0, f: 0, r: 0 }, look = { id: null, x: 0, y: 0 };
 canvas.addEventListener('pointerdown', e => {
   if (e.pointerType === 'mouse') return; e.preventDefault(); initAudio();
@@ -378,7 +381,7 @@ canvas.addEventListener('pointerdown', e => {
 }, { passive: false });
 canvas.addEventListener('pointermove', e => {
   if (e.pointerId === stick.id) { let dx = e.clientX - stick.ox, dy = e.clientY - stick.oy; const l = Math.hypot(dx, dy); if (l > 54) { dx *= 54 / l; dy *= 54 / l; } stick.r = dx / 54; stick.f = -dy / 54; $('#knob').style.transform = `translate(${dx}px,${dy}px)`; }
-  else if (e.pointerId === look.id) { cam.yaw -= (e.clientX - look.x) * 0.006; cam.pitch = clamp(cam.pitch + (e.clientY - look.y) * 0.004, -0.15, 1.1); look.x = e.clientX; look.y = e.clientY; cam.lastLook = T; }
+  else if (e.pointerId === look.id) { cam.yaw -= (e.clientX - look.x) * 0.006 / zoom; cam.pitch = clamp(cam.pitch + (e.clientY - look.y) * 0.004 / zoom, -0.15, 1.1); look.x = e.clientX; look.y = e.clientY; cam.lastLook = T; }
 });
 const endTouch = e => { if (e.pointerId === stick.id) { stick.id = null; stick.f = stick.r = 0; $('#knob').style.transform = ''; $('#stick').classList.remove('on'); } if (e.pointerId === look.id) look.id = null; };
 canvas.addEventListener('pointerup', endTouch); canvas.addEventListener('pointercancel', endTouch);
@@ -398,7 +401,21 @@ $('#dialog').addEventListener('click', () => dialog && advance());
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 3400); }
 const panel = $('#panel'); let panelActs = [];
 function showPanel(html, acts) { try { document.exitPointerLock(); } catch (e) {} panel.innerHTML = html; panel.dataset.dismissible = 'false'; panel.hidden = false; panelActs = acts || []; const b = panel.querySelector('button.b:not([disabled])'); b && b.focus({ preventScroll: true }); }
-function closePanel() { panel.hidden = true; panel.innerHTML = ''; panelActs = []; }
+function closePanel() { panel.hidden = true; panel.innerHTML = ''; panelActs = []; paused = false; }
+// ---------- pause: Esc, the II button, losing mouse lock or switching tabs. Everything (timers included) stops.
+let paused = false, pausedAt = 0;
+function pauseGame() {
+  if (paused || !panel.hidden || dialog || (DEMO && !demoStarted)) return;
+  panelCard('Paused', 'Game paused', '<p class="muted">Missions, timers and traffic are frozen.</p>', [['Resume', closePanel], ['Phone menu', () => { closePanel(); openPhone(); }, { plain: true }]]);
+  panel.dataset.dismissible = 'true'; paused = true; pausedAt = performance.now();
+}
+$('#pausebtn').addEventListener('click', pauseGame);
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
+// photo zoom (only while framing a shot)
+let zoom = 1, framingNow = false, vfOn = false;
+canvas.addEventListener('wheel', e => { if (!framingNow) return; e.preventDefault(); zoom = clamp(zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 1, 5); }, { passive: false });
+$('#zoomin').addEventListener('click', () => { zoom = clamp(zoom * 1.3, 1, 5); });
+$('#zoomout').addEventListener('click', () => { zoom = clamp(zoom / 1.3, 1, 5); });
 panel.addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b || b.disabled) return; sfx('click'); const fn = panelActs[+b.dataset.i]; fn && fn(b); });
 function panelCard(eyebrow, title, body, buttons, wide) {
   const acts = [], btns = buttons.map(([label, fn, opts = {}], i) => { acts.push(fn); return `<button class="b ${i === 0 && !opts.plain ? 'primary' : ''} ${opts.sel ? 'sel' : ''}" data-i="${i}" ${opts.disabled ? 'disabled' : ''}><span>${label}</span>${opts.small ? `<small>${opts.small}</small>` : ''}</button>`; }).join('');
@@ -498,7 +515,8 @@ function wrapProd() {
   let q = cast.reduce((s, t) => s + t.star * 12, 0) / cast.length + (cast.length === 2 ? 8 : 0) + SETS[prod.set].q + save.gear.light * 5;
   for (const t of cast) { if (t.light === prod.calls.light) q += 7; if (t.mood === prod.calls.mood) q += 7; }
   q += prod.calls.cam === 'dolly' ? 5 : prod.calls.cam === 'handheld' ? 3 : 1; q = Math.round(clamp(q * BUDGET[prod.budget].m, 10, 100));
-  const gross = Math.round(q * (25 + save.rep) * 2.2), royalty = Math.round(gross * 0.08), title = FILM_TITLES[save.releases.length % FILM_TITLES.length] + (save.releases.length >= FILM_TITLES.length ? ' ' + (save.releases.length + 1) : '');
+  // film income: about a third of the original payout, so gigs, gear and missions still matter
+  const gross = Math.round(q * (25 + save.rep) * 0.72), royalty = Math.round(gross * 0.05), title = FILM_TITLES[save.releases.length % FILM_TITLES.length] + (save.releases.length >= FILM_TITLES.length ? ' ' + (save.releases.length + 1) : '');
   panelCard('Wrap', "Cut! That's a wrap.", `<p>${q >= 75 ? 'The scene works. Everybody hit their marks and you can feel it in the dailies.' : q >= 50 ? 'Solid, sellable, nobody will remember it next year.' : 'It opens soft and dies at the box office. Listen to your talent next time.'}</p><h2>${esc(title)}</h2><p>Quality <b>${q}</b> / 100 · Opening sales <span class="money">${fmt(gross)}</span> · Royalties <span class="money">${fmt(royalty)}</span> per day</p>`,
     [['Release it', () => { save.cash += gross; save.releases.push({ title, royalty, q }); save.lastProduce = save.day; addRep(q >= 70 ? 5 : 2); sfx('win'); persist(); closePanel(); refreshHud(); toast(`${title} is out. ${fmt(gross)} in opening sales.`); const st = step(); const wasStory = prod.story; prod = null; if (wasStory && st && st.t === 'produce') nextStep(); }]]);
 }
@@ -617,8 +635,10 @@ beacon.geometry.translate(0, 30, 0); world.add(beacon);
 const v3 = new THREE.Vector3(), lookAt = new THREE.Vector3(); let snapCam = true, shake = 0, T = 0;
 let debugCam = null, doorLock = 0;
 function update(dt) {
+  if (!window.mvpAgeOk) return; // 18+ gate (assets/agegate.js) still up
   if (DEMO && !demoStarted) return;
   if (DEMO && !panel.hidden) { if ((pressed.has('Escape') || pressed.has('Tab')) && panel.dataset.dismissible === 'true') closePanel(); return; }
+  if (paused) { if (pressed.has('Escape') && performance.now() - pausedAt > 300) { closePanel(); pressed.delete('Escape'); } return; }
   T += dt;
   save.minute += dt * 2; if (save.minute >= 1440) { save.minute -= 1440; save.day++; const roy = dailyRoyalty(); if (roy) { save.cash += roy; toast(`Royalties: your films earned ${fmt(roy)} today${bootleg() ? ' (bootlegs took half)' : ''}`); sfx('cash'); refreshHud(); } }
   const h = Math.floor(save.minute / 60), mi = Math.floor(save.minute % 60); $('#clock').textContent = `DAY ${save.day} · ${((h + 11) % 12) + 1}:${String(mi).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
@@ -628,7 +648,7 @@ function update(dt) {
   if (!blocked) { if (keys.has('KeyW') || keys.has('ArrowUp')) f += 1; if (keys.has('KeyS') || keys.has('ArrowDown')) f -= 1; if (keys.has('KeyD') || keys.has('ArrowRight')) r += 1; if (keys.has('KeyA') || keys.has('ArrowLeft')) r -= 1; } else { f = r = 0; }
   if (dialog && (pressed.has('KeyE') || pressed.has('Space') || pressed.has('Enter'))) advance();
   if (pressed.has('Tab') || pressed.has('KeyM')) openPhone();
-  if (pressed.has('Escape') && !panel.hidden) closePanel();
+  if (pressed.has('Escape') && !panel.hidden) closePanel(); else if (pressed.has('Escape') && !dialog) pauseGame();
   if (driving) {
     const hit = car.update(dt, { f: clamp(f, -1, 1), r: clamp(r, -1, 1), brake: keys.has('Space') && !blocked }, D, traffic, 32 + save.gear.ride * 4);
     if (hit > 6) { shake = Math.min(0.6, hit / 40); sfx('bump'); }
@@ -662,6 +682,7 @@ function update(dt) {
   updateNPCs(dt, T);
   if (music) { const s0 = step(); music.setMood(where === 'club' ? 'club' : where === 'studio' ? 'studio' : s0 && s0.t === 'chase' ? 'chase' : 'street'); }
   if (!blocked) updMission(dt);
+  else if (!dialog && act && act.timer != null) { act.timer -= dt; if (act.timer <= 0) { closePanel(); failMission('You ran out of time.'); } } // the phone doesn't stop the clock
   if (where === 'world') {
     traffic.update(dt, driving ? { x: 999, z: 999 } : P, [car, ...(chaser ? [chaser] : [])]); peds.update(dt, P, driving ? car : null); D.update(T, P);
     moon.position.set(P.x - 30, 35, P.z - 40); sky.userData.update(T, camera.position); strip.update(T); moon.target.position.set(P.x, 0, P.z);
@@ -670,8 +691,10 @@ function update(dt) {
   } else { if (where === 'club') CLUB.update(T); setZone(SC[where].zone); }
   springs.update(dt);
   const it = blocked ? null : interaction();
-  $('#prompt').hidden = !it; if (it) { $('#prompt-text').textContent = it.prompt; $('#prompt kbd').textContent = it.key || 'E'; }
-  if (it && (pressed.has('KeyE') || (pressed.has('KeyF') && it.key === 'F'))) it.fn();
+  const carNear = !blocked && !driving && where === 'world' && Math.hypot(P.x - car.x, P.z - car.z) < 3.6;
+  $('#prompt').hidden = !it || vfOn; if (it) { $('#prompt-text').textContent = it.prompt + (carNear && it.key !== 'F' ? '  ·  F: get in the car' : ''); $('#prompt kbd').textContent = it.key || 'E'; }
+  if (pressed.has('KeyF') && carNear) enterCar(); // F always means the car, even when a door or person is closer
+  else if (it && (pressed.has('KeyE') || (pressed.has('KeyF') && it.key === 'F'))) it.fn();
   if (pressed.has('KeyP') && !blocked && !driving) photo();
   // camera
   if (driving) {
@@ -689,7 +712,18 @@ function update(dt) {
     const side = new THREE.Vector3(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)).multiplyScalar(0.45);
     v3.set(P.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * dist, 1.55 + Math.sin(cam.pitch) * dist, P.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * dist).add(side);
     if (snapCam) { camera.position.copy(v3); snapCam = false; } else camera.position.lerp(v3, 1 - Math.exp(-dt * 12));
-    lookAt.set(P.x, 1.55, P.z).add(side); camera.fov = lerp(camera.fov, 58, Math.min(1, dt * 3));
+    lookAt.set(P.x, 1.55, P.z).add(side);
+    const s1 = step(); framingNow = !blocked && !!(s1 && s1.t === 'shoot' && s1.scene === where);
+    if (!framingNow) zoom = 1; else { if (keys.has('KeyZ')) zoom = clamp(zoom * (1 + dt * 1.6), 1, 5); if (keys.has('KeyX')) zoom = clamp(zoom / (1 + dt * 1.6), 1, 5); }
+    camera.fov = lerp(camera.fov, 58 / zoom, Math.min(1, dt * (framingNow ? 8 : 3)));
+    // zoomed in = looking through the viewfinder from MVP's eye (it opens aimed at the subject's face)
+    const vf = framingNow && zoom > 1.05, eye = mvp.headBone ? mvp.headBone.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.06, 0)) : new THREE.Vector3(P.x, 1.62, P.z);
+    if (vf && !vfOn) { const t = shootTargets(), n = t && t[0]; if (n) { const h = n.rig.headBone ? n.rig.headBone.getWorldPosition(new THREE.Vector3()) : n.rig.root.position.clone().setY(1.5), d = h.sub(eye);
+      cam.yaw = Math.atan2(-d.x, -d.z); cam.pitch = clamp(0.28 - Math.atan2(d.y, Math.hypot(d.x, d.z)), -0.15, 1.1); } }
+    vfOn = vf; mvp.root.visible = !vf;
+    if (vf) { const e = 0.28 - cam.pitch, fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw);
+      P.a = P.ry = cam.yaw + Math.PI; camera.position.set(eye.x + fx * 0.25, eye.y, eye.z + fz * 0.25);
+      lookAt.set(camera.position.x + fx * Math.cos(e) * 10, camera.position.y + Math.sin(e) * 10, camera.position.z + fz * Math.cos(e) * 10); }
   }
   if (shake > 0 && !reducedMotion) { camera.position.x += rand(-1, 1) * shake * 0.3; camera.position.y += rand(-1, 1) * shake * 0.2; shake = Math.max(0, shake - dt * 2); }
   visuals.update(T, P, cam.yaw, where === 'world', reducedMotion);
@@ -708,6 +742,19 @@ function update(dt) {
   drawMap(tgt);
   if (act && act.timer != null) { $('#timer').hidden = false; $('#timer').textContent = Math.ceil(act.timer) + 's'; } else $('#timer').hidden = true;
   $('#grid').hidden = !(st && st.t === 'shoot' && st.scene === where);
+  if (!$('#grid').hidden) updateFrameGuide();
+}
+
+// live framing coach: a circle on her face, green when the shot would grade A
+function updateFrameGuide() {
+  const dot = $('#frame-dot'), tip = $('#frame-tip'), t = shootTargets();
+  camera.updateMatrixWorld(); camera.updateProjectionMatrix();
+  let best = null; if (t) for (const n of t) { const r = scoreShot(n); if (r && (!best || r.score > best.score)) best = r; }
+  if (!best) { dot.hidden = true; tip.className = ''; tip.textContent = 'Turn toward her (mouse / drag)'; return; }
+  window.__frame = best; // test hook
+  const ok = best.score >= 78; dot.hidden = false; dot.style.left = (best.u * 100) + '%'; dot.style.top = (best.v * 100) + '%'; dot.classList.toggle('ok', ok);
+  tip.className = ok ? 'ok' : '';
+  tip.textContent = ok ? `${grade(best.score)} shot: press P / SHOOT now` : best.cropped ? 'Keep her feet in the frame: use an upper gold point or zoom out' : best.fill < 0.75 ? 'Zoom in: Z, mouse wheel or +' : best.comp < 0.5 ? 'Line the circle up with a gold point' : best.peak < 0.9 ? 'Wait for her pose…' : `${grade(best.score)} · get closer to a gold point`;
 }
 
 // ---------- demo presentation (the campaign remains available without ?demo=1)
@@ -771,4 +818,4 @@ try { const stored = localStorage.getItem('mvp_graphics_quality'); if (['perform
 applyQuality(preferredQuality);
 refreshHud(); $('#loading').hidden = true; if (DEMO) { demoStarted = true; update(0); demoTitle(); } frame();
 addEventListener('beforeunload', persist);
-window.__world = { SC, traffic, set debugCam(v) { debugCam = v; }, probe() { const r = renderer, out = {}; r.info.autoReset = false; const count = (k, f) => { r.info.reset(); f(); out[k] = r.info.render.calls; }; count('main', () => r.render(world, camera)); count('reflect', () => wet.render(renderer, world, camera)); const by = {}; world.traverse(o => { if (o.isMesh || o.isSprite || o.isPoints) { let p = o; while (p.parent && p.parent !== world) p = p.parent; const k = (p.name || p.type) + ':' + (o.isSprite ? 'sprite' : o.isInstancedMesh ? 'inst' : 'mesh'); by[k] = (by[k] || 0) + (Array.isArray(o.material) ? o.material.length : 1); } }); out.by = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 14); r.info.autoReset = true; return out; }, renderFrame() { if (where === 'world') wet.render(renderer, world, camera); composer.render(); }, P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update, get mvp() { return mvp; } };
+window.__world = { SC, traffic, set debugCam(v) { debugCam = v; }, probe() { const r = renderer, out = {}; r.info.autoReset = false; const count = (k, f) => { r.info.reset(); f(); out[k] = r.info.render.calls; }; count('main', () => r.render(world, camera)); count('reflect', () => wet.render(renderer, world, camera)); const by = {}; world.traverse(o => { if (o.isMesh || o.isSprite || o.isPoints) { let p = o; while (p.parent && p.parent !== world) p = p.parent; const k = (p.name || p.type) + ':' + (o.isSprite ? 'sprite' : o.isInstancedMesh ? 'inst' : 'mesh'); by[k] = (by[k] || 0) + (Array.isArray(o.material) ? o.material.length : 1); } }); out.by = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 14); r.info.autoReset = true; return out; }, renderFrame() { if (where === 'world') wet.render(renderer, world, camera); composer.render(); }, P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update, tick(dt) { update(dt); pressed.clear(); }, persist, get mvp() { return mvp; }, get paused() { return paused; }, get driving() { return driving; } };
