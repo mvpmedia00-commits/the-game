@@ -160,6 +160,7 @@ export function buildStudioHQ(sc) {
     { id: 'edit', x: 12.2, z: 1.2, ry: Math.PI / 2, act: 'type', say: 'Logging footage in the edit bay' },
     { id: 'posters', x: 12.9, z: 11, ry: Math.PI / 2, act: 'dust', say: 'Dusting the film wall' },
     { id: 'coffee', x: 6.2, z: 6.4, ry: Math.PI, act: 'coffee', say: 'Coffee break' },
+    { id: 'rehearse', x: 0, z: 0.6, ry: 0, act: 'dance', say: 'Rehearsing her routine on Stage A' },
   ];
   return {
     colliders, circles, setPosters, jobs, aisleZ: 7.9,

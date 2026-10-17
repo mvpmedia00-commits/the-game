@@ -44,16 +44,16 @@ export class StudioHelper {
     this.path = j.carryFrom ? [...this.route(this.pl, j.carryFrom), { pickup: true }, ...this.route(j.carryFrom, j)] : this.route(this.pl, j);
     this.mode = 'walk';
   }
-  attend(x, z, secs = 8) { this.attendT = secs; this.face = Math.atan2(x - this.pl.x, z - this.pl.z); if (this.mode !== 'attend') { this.before = this.mode; this.mode = 'attend'; } }
+  attend(x, z, secs = 8) { if (this.mode !== 'attend') this.attendLen = secs; this.attendT = secs; this.face = Math.atan2(x - this.pl.x, z - this.pl.z); if (this.mode !== 'attend') { this.before = this.mode; this.mode = 'attend'; } }
   // movement (runs even when the player is elsewhere, so she's somewhere new when you come back)
   tick(dt) {
     const pl = this.pl;
     if (this.mode === 'attend') { this.attendT -= dt; pl.ry += angDiff(pl.ry, this.face) * Math.min(1, dt * 6); if (this.attendT <= 0) this.mode = this.before === 'walk' ? 'walk' : 'work'; return; }
-    if (this.mode === 'work') { this.t += dt; pl.ry += angDiff(pl.ry, this.job.ry) * Math.min(1, dt * 4); if (this.t > this.workFor) { this.t = 0; this.workFor = this.job.act === 'stack' ? 4 : 9 + Math.random() * 6; this.next(); } return; }
+    if (this.mode === 'work') { this.t += dt; pl.ry += angDiff(pl.ry, this.job.ry) * Math.min(1, dt * 4); if (this.t > this.workFor) { this.t = 0; this.workFor = this.job.act === 'stack' ? 4 : this.job.act === 'dance' ? 18 : 9 + Math.random() * 6; this.next(); } return; }
     // walking
     let tgt = this.path[0];
     while (tgt && tgt.pickup) { this.carry = true; this.path.shift(); tgt = this.path[0]; }
-    if (!tgt) { this.mode = 'work'; this.t = 0; this.workFor = this.job.act === 'stack' ? 4 : 9 + Math.random() * 6; return; }
+    if (!tgt) { this.mode = 'work'; this.t = 0; this.workFor = this.job.act === 'stack' ? 4 : this.job.act === 'dance' ? 18 : 9 + Math.random() * 6; return; }
     const dx = tgt.x - pl.x, dz = tgt.z - pl.z, d = Math.hypot(dx, dz), step = 1.25 * dt;
     if (d <= step) { pl.x = tgt.x; pl.z = tgt.z; this.path.shift(); }
     else { pl.x += dx / d * step; pl.z += dz / d * step; pl.ry += angDiff(pl.ry, Math.atan2(dx, dz)) * Math.min(1, dt * 8); }
@@ -62,6 +62,12 @@ export class StudioHelper {
   // animation + props (only while the player is in the studio)
   pose(C, rig, dt, t) {
     const walking = this.mode === 'walk';
+    // recorded clips from Ruby's own file: dance rehearsal on Stage A, and a nod when you come over to talk
+    if (rig.dance && ((this.mode === 'work' && this.job.act === 'dance') || (this.mode === 'attend' && this.attendT > this.attendLen - 3.5))) {
+      if (!this.dancing) { rig.dance.mixer.stopAllAction(); rig.dance.cur = null; this.dancing = true; } // start each clip clean
+      rig.dance.play(this.mode === 'attend' ? 'nod' : 'twerk', 0.35); rig.dance.update(dt, 0); this.hideProps(); return;
+    }
+    this.dancing = false;
     this.walkAmt += ((walking ? 1 : 0) - this.walkAmt) * Math.min(1, dt * 6);
     let act = walking ? (this.carry ? 'carry' : null) : this.mode === 'attend' ? 'idle' : this.job.act;
     if (act === 'stack') act = this.t < 1.6 ? 'carry' : 'adjust'; // set the box down, then square it up

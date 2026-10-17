@@ -15,6 +15,7 @@ import { SpringSystem } from './lib/springs.js';
 import { mixamoRig } from './lib/retarget.js';
 import { loadMocap, MocapDriver } from './lib/mocap.js';
 const mocapLib = loadMocap('../assets/animations/mocap.glb').catch(() => null); // recorded idle / walk / run
+const danceLib = loadMocap('../assets/animations/ruby-dance.glb').catch(() => null); // Ruby's own dance (twerk) + nod
 
 const $ = s => document.querySelector(s);
 const canvas = $('#view');
@@ -91,7 +92,7 @@ function useGLTF(s, gltf, name) {
   s.found = s.springs.scan(root);
   // models rigged with the game's joint names (tools/autorig) are driven by the same poses, walk and dance as the stand-ins
   const B = {}; root.traverse(o => { if (o.isBone) B[o.name] = o; });
-  if (mixamo) { s.rig = mixamo; mixamo.modelRoot = root; mixamo.bones = {}; root.traverse(o => { if (o.isBone) mixamo.bones[o.name.replace(/^mixamorig\d*[:_]?/i, '')] = o; }); mocapLib.then(lib => { if (lib && s.rig === mixamo) mixamo.mocap = new MocapDriver(mixamo, lib); }); }
+  if (mixamo) { s.rig = mixamo; mixamo.modelRoot = root; mixamo.bones = {}; root.traverse(o => { if (o.isBone) mixamo.bones[o.name.replace(/^mixamorig\d*[:_]?/i, '')] = o; }); mocapLib.then(lib => { if (lib && s.rig === mixamo) mixamo.mocap = new MocapDriver(mixamo, lib); }); if (s.key === 'ruby') danceLib.then(lib => { if (lib && s.rig === mixamo) mixamo.dance = new MocapDriver(mixamo, lib); }); }
   else if (RIG_JOINTS.every(k => B[k])) { s.rig = { root }; for (const k of RIG_JOINTS) s.rig[k] = B[k]; s.rig.cur = null; s.rig.bobNode = B.hips; s.rig.bobScale = 1 / s.height; }
   s.clips = gltf.animations || [];
   s.animated = new Set(s.clips.flatMap(c => c.tracks.map(tr => tr.name.split('.')[0])));
@@ -128,7 +129,8 @@ function animate(s, t, dt) {
   }
   if (r.prop) C.updProps(r);
   if (r.apply) r.apply(); // retargeted rigs: copy the pose onto the model's bones
-  if (r.mocap) { r.mocap.play(mode === 'walk' ? 'walk' : 'idle'); r.mocap.update(dt, mode === 'walk' || mode === 'idle' ? 0 : 1); } // recorded motion for idle/walk
+  if (mode === 'dance' && r.dance) { r.dance.play('twerk'); r.dance.update(dt, 0); } // Ruby's recorded dance
+  else if (r.mocap) { r.mocap.play(mode === 'walk' ? 'walk' : 'idle'); r.mocap.update(dt, mode === 'walk' || mode === 'idle' ? 0 : 1); } // recorded motion for idle/walk
 }
 
 // ---------- UI

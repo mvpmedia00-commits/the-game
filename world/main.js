@@ -180,6 +180,7 @@ function adoptRig(old, next) {
 }
 // recorded motion capture (idle / walk / run ...) for the model characters
 const mocapLib = loadMocap('../assets/animations/mocap.glb').catch(e => { console.warn('Motion capture unavailable', e); return null; });
+const danceLib = loadMocap('../assets/animations/ruby-dance.glb').catch(e => { console.warn('Ruby dance unavailable', e); return null; }); // Ruby's own clips: twerk, nod
 // While the real models load, the code-built stand-ins stay hidden (no flash of the blocky version).
 // If a model fails, or takes longer than 45 s (very slow connection), the stand-in is shown instead.
 const hideStandIn = r => r.root.children.forEach(c => { c.userData.standIn = c.visible; c.visible = false; });
@@ -190,7 +191,7 @@ let charsReady = false; const markReady = () => { if (charsReady) return; charsR
 setTimeout(() => { if (NPCS.ruby.rig === standInRuby) showStandIn(standInRuby); if (mvp.root === standInMvp) showStandIn(mvp); markReady(); }, 45000);
 loadCharacter('../assets/characters/ruby.glb', { name: 'Ruby', height: 1.68, armPitch: -0.22 }).then(async rig => {
   if (!rig) return showStandIn(standInRuby);
-  const lib = await mocapLib; if (lib) rig.mocap = new MocapDriver(rig, lib); // before anything moves the bones
+  const [lib, dlib] = await Promise.all([mocapLib, danceLib]); if (lib) rig.mocap = new MocapDriver(rig, lib); if (dlib) rig.dance = new MocapDriver(rig, dlib); // before anything moves the bones
   const n = NPCS.ruby; adoptRig(n.rig, rig); noReflect(rig.root); n.rig = rig;
 }).catch(e => { console.warn('Ruby model unavailable, using the code-built Ruby', e); showStandIn(standInRuby); });
 loadCharacter('../assets/characters/mvp.glb', { name: 'MVP', height: 1.85 }).then(async rig => {
@@ -259,6 +260,7 @@ function updateNPCs(dt, t) {
     if (pl.scene !== where) continue;
     n.poseT += dt;
     if (pl.pose === 'helper') { rubyHelp.pose(C, n.rig, dt, t); continue; }
+    if (pl.pose === 'dance' && n.rig.dance) { n.rig.dance.play('twerk'); n.rig.dance.update(dt, 0); n.peak = Math.abs(Math.sin(t * 2.2)) > 0.8 ? 1 : 0.45; continue; } // recorded dance
     if (pl.pose === 'dance') { C.setPose(n.rig, DANCE(t), Math.min(1, dt * 12)); n.peak = Math.abs(Math.sin(t * 4)) > 0.85 ? 1 : 0.4; }
     else if (pl.pose === 'pose') { if (n.poseT > 3) { n.poseT = 0; n.pose = (n.pose + 1) % POSE_LIST.length; } C.setPose(n.rig, POSE_LIST[n.pose], Math.min(1, dt * 4)); n.peak = n.poseT > 0.9 && n.poseT < 2.6 ? 1 : 0.35; }
     else if (pl.pose === 'guard') C.setPose(n.rig, { shL: [-0.3, 0, -0.35], elL: [-1.3, 0, 0], shR: [-0.3, 0, 0.35], elR: [-1.3, 0, 0], hpL: [0, 0, 0.1], hpR: [0, 0, -0.1] }, Math.min(1, dt * 4));

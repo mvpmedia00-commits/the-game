@@ -442,6 +442,9 @@ The world game still uses the code-built characters; swapping the real models in
   - She lives there, except on the premiere's red carpet.
   - She cycles through jobs: sweeping, wiping mirrors, sorting wardrobe, carrying gear to the stage, setting lights, logging footage, dusting the film wall and coffee breaks.
   - She walks between jobs along the aisle in front of the stage (z ≈ 7.9), with mocap walking and a hand-made pose plus a prop for each job.
+- **Ruby's own recorded clips** (`assets/animations/ruby-dance.glb`): `twerk` (9 s) and `nod` (4 s), extracted from her Tripo export with the mesh stripped.
+  - They're loaded as a second `MocapDriver` (`rig.dance`), used for her Velvet Room set, her Stage A rehearsal job, the nod when you come over to talk, and the HD demo's Dance mode.
+  - To add more of her clips, export from Tripo with the animation on and strip the mesh the same way.
 - **Talking to Ruby** (`openRuby`):
   - Chat (lines in `RUBY_STUDIO`, story.js).
   - **Prep the set:** +6 quality on your next film, once a day.
