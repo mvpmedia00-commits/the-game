@@ -12,6 +12,7 @@ import * as C from './lib/characters.js';
 import { buildStudio } from './lib/studio.js';
 import { buildPool } from './lib/pool.js';
 import { SpringSystem } from './lib/springs.js';
+import { mixamoRig } from './lib/retarget.js';
 
 const $ = s => document.querySelector(s);
 const canvas = $('#view');
@@ -44,12 +45,13 @@ composer.addPass(new OutputPass());
 const cast = new THREE.Group();
 const SLOTS = {
   mvp: { label: 'MVP', file: '../assets/characters/mvp.glb', pos: [-0.45, 0, 0], ry: 0.18, height: 1.9, look: Object.assign({}, C.MVP_LOOK, { camera: false, handCam: 'both' }) },
-  ruby: { label: 'Ruby', file: '../assets/characters/ruby.glb', pos: [0.42, 0, 0.28], ry: -0.42, height: 1.68, look: Object.assign({ outfit: 'two' }, C.TALENT.ruby.look, { handCam: 'L' }) },
+  ruby: { label: 'Ruby', file: '../assets/characters/ruby.glb', armPitch: -0.22, pos: [0.42, 0, 0.28], ry: -0.42, height: 1.68, look: Object.assign({ outfit: 'two' }, C.TALENT.ruby.look, { handCam: 'L' }) },
 };
 for (const [key, s] of Object.entries(SLOTS)) {
   s.key = key; s.holder = new THREE.Group(); s.holder.position.set(...s.pos); s.holder.rotation.y = s.ry; cast.add(s.holder);
   s.springs = new SpringSystem();
 }
+const RIG_JOINTS = ['hips', 'spine', 'head', 'shL', 'elL', 'shR', 'elR', 'hpL', 'knL', 'hpR', 'knR'];
 function clearSlot(s) { if (s.model) s.holder.remove(s.model); s.model = null; s.rig = null; s.mixer = null; s.clips = []; s.springs.clear(); s.found = {}; }
 function useStandIn(s) {
   clearSlot(s);
@@ -58,18 +60,37 @@ function useStandIn(s) {
   s.found = {}; for (const sp of rig.springs) s.found[sp.kind] = (s.found[sp.kind] || 0) + 1;
   refreshUI();
 }
+// Bounds of the model as it stands: rigged meshes are measured after updating their skeleton (Box3.setFromObject
+// would skin them with stale bone matrices). Rigged meshes also skip frustum culling (they move).
+function restBox(root) {
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3(), b = new THREE.Box3();
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    if (o.isSkinnedMesh) { // measure through the skeleton: compressed (quantized) skins store positions in a packed space
+      o.frustumCulled = false; o.skeleton.update(); o.computeBoundingBox(); box.union(b.copy(o.boundingBox).applyMatrix4(o.matrixWorld)); return;
+    }
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); box.union(b.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld));
+  });
+  return box;
+}
 const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
 function useGLTF(s, gltf, name) {
   clearSlot(s);
   const root = gltf.scene;
   root.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; if (o.material && o.material.isMeshStandardMaterial) o.material.envMapIntensity = 1; } });
+  const mixamo = mixamoRig(root, { armPitch: s.armPitch }); // Mixamo skeletons (Tripo, Mixamo, ActorCore) get the game's poses too; also turns the model to face +z
   // fit to the slot's height, feet on the floor, centred
-  const box = new THREE.Box3().setFromObject(root), size = box.getSize(new THREE.Vector3());
+  const box = restBox(root), size = box.getSize(new THREE.Vector3());
   const k = s.height / Math.max(0.01, size.y); root.scale.setScalar(k);
-  box.setFromObject(root); const c = box.getCenter(new THREE.Vector3());
+  box.copy(restBox(root)); const c = box.getCenter(new THREE.Vector3());
   root.position.x -= c.x; root.position.z -= c.z; root.position.y -= box.min.y;
   s.model = root; s.holder.add(root); root.updateMatrixWorld(true);
   s.found = s.springs.scan(root);
+  // models rigged with the game's joint names (tools/autorig) are driven by the same poses, walk and dance as the stand-ins
+  const B = {}; root.traverse(o => { if (o.isBone) B[o.name] = o; });
+  if (mixamo) s.rig = mixamo;
+  else if (RIG_JOINTS.every(k => B[k])) { s.rig = { root }; for (const k of RIG_JOINTS) s.rig[k] = B[k]; s.rig.cur = null; s.rig.bobNode = B.hips; s.rig.bobScale = 1 / s.height; }
   s.clips = gltf.animations || [];
   s.animated = new Set(s.clips.flatMap(c => c.tracks.map(tr => tr.name.split('.')[0])));
   if (s.clips.length) { s.mixer = new THREE.AnimationMixer(root); s.action = s.mixer.clipAction(s.clips[0]); s.action.play(); s.clipIndex = 0; }
@@ -104,6 +125,7 @@ function animate(s, t, dt) {
     else { const list = [C.RUBY_A, C.POSES[1], C.RUBY_B, C.POSES[3], C.POSES[5], C.POSES[2]]; C.setPose(r, list[Math.floor(t / 3.2) % list.length], Math.min(1, dt * 3)); }
   }
   if (r.prop) C.updProps(r);
+  if (r.apply) r.apply(); // retargeted rigs: copy the pose onto the model's bones
 }
 
 // ---------- UI

@@ -59,8 +59,16 @@ export function buildClub(sc) {
     crowd.push({ ...p, ph: Math.random() * 6 }); circles.push({ x, z, r: 0.4 });
   }
   dressVelvetInterior(sc);
+  // the way out: gold-framed double doors in the back wall, a lit EXIT sign and a floor light path
+  const ex = new THREE.Group(); ex.name = 'Velvet Room • exit'; ex.position.set(0, 0, 14.92); ex.rotation.y = Math.PI; sc.add(ex);
+  ex.add(M(boxG(3.6, 3.3, 0.16), mat('#c8a050', 0.25, 1), 0, 1.65, 0.02), M(boxG(3.2, 3.0, 0.1), mat('#0a0406', 0.4), 0, 1.5, 0.08));
+  for (const x of [-0.79, 0.79]) ex.add(M(boxG(1.52, 2.9, 0.12), mat('#2a0a12', 0.35, 0.3), x, 1.45, 0.12), M(boxG(1.0, 0.07, 0.07), mat('#e8c060', 0.2, 1), x, 1.1, 0.22));
+  const exitSign = signMesh('EXIT', '#ff2a3a', 1.8, 0.7); exitSign.position.set(0, 3.75, 0.2); ex.add(exitSign);
+  const blvd = signMesh('LAS VEGAS BLVD', '#ffd27a', 2.8, 0.36); blvd.position.set(0, 3.2, 0.2); ex.add(blvd);
+  for (let z = 1.2; z <= 6.6; z += 1.08) for (const x of [-1.9, 1.9]) ex.add(M(cylG(0.09, 0.09, 0.02, 12), neon('#ff2a3a', 5), x, 0.02, z));
+  const exitLight = new THREE.PointLight(0xff3040, 24, 9, 2); exitLight.position.set(0, 3, 13.2); sc.add(exitLight);
   const bounds = { minX: -12.4, maxX: 12.4, minZ: -14.4, maxZ: 14 };
-  const exit = { x: 0, z: 13.2 };
+  const exit = { x: 0, z: 13.2, r: 3.4 };
   const update = (t) => {
     for (const s of spots) { const tx = Math.sin(t * 0.7 + s.ph) * 2.2, tz = -7 + Math.cos(t * 0.5 + s.ph) * 1.4; s.s.target.position.set(tx, 1, tz); const dir = new THREE.Vector3(tx - s.s.position.x, 1 - s.s.position.y, tz - s.s.position.z).normalize(); s.beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir); }
     for (const c of crowd) { const b = Math.max(0, Math.sin(t * 7 + c.ph)); c.root.position.y = b * 0.06; const up = Math.sin(c.ph) > 0.2; c.arms[0].rotation.x = up ? -2.5 - b * 0.4 : -0.2 - b * 0.3; c.arms[1].rotation.x = -0.15 - b * 0.25; }
