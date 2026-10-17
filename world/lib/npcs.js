@@ -1,5 +1,6 @@
 // Street life: signal-controlled traffic and sidewalk pedestrians.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mat, neon, glowTex, M, Rt, cylG, sphG } from '../../hd-demo/lib/characters.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -21,17 +22,35 @@ function carGeos() {
 const flareMat = {};
 const flare = (c, k) => flareMat[c + k] || (flareMat[c + k] = new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(c).multiplyScalar(k), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
 let taxiSign = null;
+let parts = null, beamMat = null, beamGeo = null;
+function carParts() {
+  if (parts) return parts;
+  const bake = list => mergeGeometries(list.map(([geo, x, y, z, rx = 0]) => geo.clone().applyMatrix4(new THREE.Matrix4().makeRotationX(rx).setPosition(x, y, z))));
+  const at = (geo, list, rx) => list.map(([x, y, z]) => [geo, x, y, z, rx]), corners = [[1.45, 0.36, 0.88], [1.45, 0.36, -0.88], [-1.45, 0.36, 0.88], [-1.45, 0.36, -0.88]];
+  return (parts = {
+    tires: bake(at(new THREE.CylinderGeometry(0.36, 0.36, 0.26, 20), corners, Math.PI / 2)), rims: bake(at(new THREE.CylinderGeometry(0.24, 0.24, 0.27, 12), corners, Math.PI / 2)),
+    head: bake(at(new THREE.BoxGeometry(0.06, 0.12, 0.42), [[2.36, 0.74, 0.58], [2.36, 0.74, -0.58]])), tail: bake(at(new THREE.BoxGeometry(0.06, 0.1, 0.5), [[-2.36, 0.8, 0.58], [-2.36, 0.8, -0.58]])),
+    stripes: bake(at(new THREE.BoxGeometry(2.6, 0.08, 0.02), [[0, 0.72, 0.93], [0, 0.72, -0.93]])),
+  });
+}
 export function carModel(color, mine, opts = {}) {
   carGeos();
   const g = new THREE.Group(), glass = mat('#0a1018', 0.05, 0.9), tire = mat('#0e0e10', 0.85), rim = mat('#c8c8d0', 0.25, 1);
   const body = new THREE.Mesh(bodyGeo, paint(color)); body.castShadow = true; g.add(body, new THREE.Mesh(glassGeo, glass));
   const wheels = [];
-  for (const x of [1.45, -1.45]) for (const z of [0.88, -0.88]) {
-    const wg = new THREE.Group(); wg.position.set(x, 0.36, z); g.add(wg); wheels.push(wg);
-    wg.add(Rt(M(cylG(0.36, 0.36, 0.26, 20), tire), Math.PI / 2, 0, 0), Rt(M(cylG(0.24, 0.24, 0.27, 12), rim), Math.PI / 2, 0, 0));
+  if (mine) { // your car steers its front wheels
+    for (const x of [1.45, -1.45]) for (const z of [0.88, -0.88]) {
+      const wg = new THREE.Group(); wg.position.set(x, 0.36, z); g.add(wg); wheels.push(wg);
+      wg.add(Rt(M(cylG(0.36, 0.36, 0.26, 20), tire), Math.PI / 2, 0, 0), Rt(M(cylG(0.24, 0.24, 0.27, 12), rim), Math.PI / 2, 0, 0));
+    }
+    for (const z of [0.58, -0.58]) g.add(M(new THREE.BoxGeometry(0.06, 0.12, 0.42), neon('#fff4d8', 9), 2.36, 0.74, z), M(new THREE.BoxGeometry(0.06, 0.1, 0.5), neon('#ff1a24', 5), -2.36, 0.8, z));
+  } else { // other cars: same parts pre-merged per material (6 draw calls instead of 14); plain wheels look the same spinning or not
+    const P = carParts();
+    g.add(new THREE.Mesh(P.tires, tire), new THREE.Mesh(P.rims, rim), new THREE.Mesh(P.head, neon('#fff4d8', 9)), new THREE.Mesh(P.tail, neon('#ff1a24', 5)));
+    for (let i = 0; i < 4; i++) wheels.push(new THREE.Object3D()); // traffic/chase code still turns these
   }
-  for (const z of [0.58, -0.58]) g.add(M(new THREE.BoxGeometry(0.06, 0.12, 0.42), neon('#fff4d8', 9), 2.36, 0.74, z), M(new THREE.BoxGeometry(0.06, 0.1, 0.5), neon('#ff1a24', 5), -2.36, 0.8, z));
-  const beam = Rt(M(new THREE.PlaneGeometry(10, 6), new THREE.MeshBasicMaterial({ map: glowTex, color: new THREE.Color(0.9, 0.85, 0.7), transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false })), -Math.PI / 2, 0, 0);
+  beamMat = beamMat || new THREE.MeshBasicMaterial({ map: glowTex, color: new THREE.Color(0.9, 0.85, 0.7), transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false });
+  const beam = Rt(M(beamGeo = beamGeo || new THREE.PlaneGeometry(10, 6), beamMat), -Math.PI / 2, 0, 0);
   beam.position.set(6.5, 0.05, 0); beam.scale.set(1, 0.6, 1); g.add(beam);
   if (mine) g.add(M(new THREE.BoxGeometry(0.02, 0.1, 0.32), neon('#ff2a3a', 3), -2.33, 0.55, 0));
   // lamp flares: soft halos that bloom and show in the wet-road reflection
@@ -42,7 +61,7 @@ export function carModel(color, mine, opts = {}) {
   if (opts.taxi) { // roof sign + checker stripe
     taxiSign = taxiSign || new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff2b0, emissiveIntensity: 0.9, roughness: 0.4 });
     g.add(M(new THREE.BoxGeometry(0.5, 0.22, 1.0), taxiSign, -0.1, 1.56, 0));
-    for (const z of [0.93, -0.93]) g.add(M(new THREE.BoxGeometry(2.6, 0.08, 0.02), mat('#141414', 0.5), 0, 0.72, z));
+    g.add(new THREE.Mesh(carParts().stripes, mat('#141414', 0.5)));
   }
   g.userData.wheels = wheels;
   return g;

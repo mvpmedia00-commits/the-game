@@ -57,16 +57,18 @@ const PROGRAMS = {
 };
 const SPILL = { mvp: '#ff2a3a', jackpot: '#ffc860', scarlet: '#ff4fd8', weekly: '#3ad7ff' };
 class LedBoard {
-  constructor(parent, program, x, y, z, ry, wm, hm, spill = true) {
-    this.c = document.createElement('canvas'); this.c.width = 512; this.c.height = Math.round(512 * hm / wm); this.g = this.c.getContext('2d');
-    this.tex = new THREE.CanvasTexture(this.c); this.tex.colorSpace = THREE.SRGBColorSpace; this.tex.anisotropy = 4; this.program = PROGRAMS[program];
+  constructor(parent, program, x, y, z, ry, wm, hm, spill = true, twin = null) {
+    if (twin) { this.c = twin.c; this.tex = twin.tex; this.twin = true; } // back-to-back screens showing the same program share one canvas
+    else { this.c = document.createElement('canvas'); this.c.width = 512; this.c.height = Math.round(512 * hm / wm); this.g = this.c.getContext('2d');
+      this.tex = new THREE.CanvasTexture(this.c); this.tex.colorSpace = THREE.SRGBColorSpace; this.tex.anisotropy = 4; }
+    this.program = PROGRAMS[program];
     const grp = new THREE.Group(); grp.position.set(x, y, z); grp.rotation.y = ry; parent.add(grp);
     const screen = new THREE.Mesh(new THREE.PlaneGeometry(wm, hm), new THREE.MeshBasicMaterial({ map: this.tex, color: new THREE.Color(1.7, 1.7, 1.7), toneMapped: true }));
     screen.position.z = 0.12; grp.add(screen, M(new THREE.BoxGeometry(wm + 0.8, hm + 0.8, 0.4), mat('#141216', 0.4, 0.8), 0, 0, -0.1));
     // cast a little of the screen's colour onto the street in front of it
     if (spill) { this.spill = new THREE.PointLight(0xffffff, 0, Math.max(wm, hm) * 1.6, 2); this.spill.position.set(0, -hm * 0.2, Math.max(wm, hm) * 0.5); grp.add(this.spill); }
     if (this.spill) { this.spill.color.set(SPILL[program]); this.spill.intensity = 45; }
-    this.group = grp; this.t = -1; this.draw(0);
+    this.group = grp; this.t = -1; if (!twin) this.draw(0);
   }
   draw(t) {
     const g = this.g, w = this.c.width, h = this.c.height; this.program(g, w, h, t);
@@ -74,7 +76,8 @@ class LedBoard {
     this.tex.needsUpdate = true;
     
   }
-  update(t) { if (t - this.t > 1 / 12) { this.t = t; this.draw(t); } }
+  stale(t) { return this.twin ? 0 : t - this.t; }
+  update(t) { this.t = t; this.draw(t); }
 }
 
 // ---------- chasing bulb marquee around a rectangle (in a group's local XY plane)
@@ -120,7 +123,7 @@ export function buildStrip(scene, D) {
   py.add(M(new THREE.BoxGeometry(1.2, 2.4, 7.4), mat('#1a1208', 0.4, 0.6), 0, 22.6, 0));
   const head = signMesh('CROWN', '#ffcc33', 7, 2); for (const s of [1, -1]) { const h2 = head.clone(); h2.position.set(0.62 * s, 22.6, 0); h2.rotation.y = s * Math.PI / 2; py.add(h2); }
   for (const s of [1, -1]) {
-    const b = new LedBoard(py, 'jackpot', 0.45 * s, 15, 0, s * Math.PI / 2, 6.4, 7.6, s > 0); boards.push(b);
+    const b = new LedBoard(py, 'jackpot', 0.45 * s, 15, 0, s * Math.PI / 2, 6.4, 7.6, s > 0, s < 0 ? boards[boards.length - 1] : null); boards.push(b);
     marquees.push(new Marquee(py, 0.5 * s, 15, 0, s * Math.PI / 2, 7.2, 8.4, 0.4, true));
   }
 
@@ -171,5 +174,10 @@ export function buildStrip(scene, D) {
   const upGlow = new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(1.4, 0.9, 0.5), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
   for (const [x, z] of uplights) { const s = new THREE.Sprite(upGlow); s.position.set(x, 1.4, z); s.scale.set(1.6, 3.2, 1); W.add(s); }
 
-  return { group: W, update(t) { for (const b of boards) b.update(t); for (const m of marquees) m.update(t); } };
+  // LED boards redraw at ~12 fps, but at most two per frame (the stalest first): redrawing a 512 px canvas and
+  // re-uploading it with mipmaps for every board on the same frame was a regular spike.
+  return { group: W, update(t) {
+    for (let k = 0; k < 2; k++) { let best = null; for (const b of boards) if (b.stale(t) > 1 / 12 && (!best || b.stale(t) > best.stale(t))) best = b; if (!best) break; best.update(t); }
+    for (const m of marquees) m.update(t);
+  } };
 }

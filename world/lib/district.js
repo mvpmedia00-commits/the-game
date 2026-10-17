@@ -110,7 +110,7 @@ export function buildDistrict(scene) {
   building(-95, -36, -110, -18, 16, 'casino', '#ffcc33');
   const tower = building(-82, -52, -96, -62, 104, 'casino', '#ffcc33', { y0: 0, noCollide: true, noTier: true, noRoof: true });
   for (let i = 0; i < 6; i++) W.add(M(boxG(0.3, 100, 0.3), neon('#ffcc33', 3), -82 + i * 6, 52, -61.9));
-  const crown = new THREE.Group(); crown.position.set(-67, 104, -79); W.add(crown);
+  const crown = new THREE.Group(); crown.userData.dynamic = true; crown.position.set(-67, 104, -79); W.add(crown); // spins: not batched
   crown.add(Rt(M(new THREE.TorusGeometry(11, 0.8, 10, 40), mat('#e8b64c', 0.2, 1)), Math.PI / 2, 0, 0));
   for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; crown.add(M(new THREE.ConeGeometry(1.4, 7, 10), mat('#e8b64c', 0.2, 1), Math.cos(a) * 11, 3.5, Math.sin(a) * 11), M(sphG(0.8, 12, 8), neon('#ff2a3a', 4), Math.cos(a) * 11, 7.4, Math.sin(a) * 11)); }
   const casinoSign = signMesh('CROWN', '#ffcc33', 26, 6); casinoSign.position.set(-67, 88, -61.6); W.add(casinoSign);
@@ -293,5 +293,5 @@ export function buildDistrict(scene) {
     crown.rotation.y = t * 0.05; roofs.update(t);
     const on = Math.sin(t * 6) > 0; for (const b of blinkers) b.material.color.setRGB(on ? 3 : 0.2, on ? 1.8 : 0.1, 0);
   };
-  return { groundMats: { asphalt, walk }, shafts, colliders, circles, pois, zones, bounds, inBounds, NPC, spawn, parked, myCarSpot, walks, signals, update, premiere, doors: { velvet: velvetDoor, lens: lensDoor, studio: studioDoor } };
+  return { group: W, groundMats: { asphalt, walk }, shafts, colliders, circles, pois, zones, bounds, inBounds, NPC, spawn, parked, myCarSpot, walks, signals, update, premiere, doors: { velvet: velvetDoor, lens: lensDoor, studio: studioDoor } };
 }

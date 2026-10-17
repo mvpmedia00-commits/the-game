@@ -9,6 +9,8 @@ import { buildVisuals, CinemaGrade } from './lib/visuals.js';
 import { makeNightSky } from './lib/sky.js';
 import { WetReflections } from './lib/reflect.js';
 import { buildStrip } from './lib/strip.js';
+import { mergeStatic } from './lib/batch.js';
+import { LightPool } from './lib/lightpool.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import * as C from '../hd-demo/lib/characters.js';
@@ -91,7 +93,9 @@ const visuals = buildVisuals(world, D);
 const strip = buildStrip(world, D);
 const traffic = new Traffic(world, D.signals);
 const peds = new Pedestrians(world, D.walks, TOUCH ? 18 : 30);
-for (const p of D.parked) { const c = carModel(p.color); c.position.set(p.x, 0, p.z); c.rotation.y = p.ry + Math.PI / 2; world.add(c); }
+const parkedCars = D.parked.map(p => { const c = carModel(p.color); c.position.set(p.x, 0, p.z); c.rotation.y = p.ry + Math.PI / 2; world.add(c); return c; });
+mergeStatic([D.group, strip.group, ...parkedCars], world); // ~1,000 unmoving meshes → a few hundred draws
+const lightPool = (() => { const ls = []; for (const g of [D.group, strip.group]) g.traverse(o => { if (o.isPointLight) ls.push(o); }); return new LightPool(world, ls, 5); })(); // 14 fixed street lights → 5 real ones near the view
 const carMesh = carModel('#c8141f', true); world.add(carMesh);
 const car = new PlayerCar(carMesh, D.myCarSpot.x, D.myCarSpot.z, D.myCarSpot.a);
 const wet = new WetReflections(); // rain-slick streets mirror the neon
@@ -763,7 +767,7 @@ function update(dt) {
   else if (!dialog && act && act.timer != null) { act.timer -= dt; if (act.timer <= 0) { closePanel(); failMission('You ran out of time.'); } } // the phone doesn't stop the clock
   if (where === 'world') {
     traffic.update(dt, driving ? { x: 999, z: 999 } : P, [car, ...(chaser ? [chaser] : [])]); peds.update(dt, P, driving ? car : null); D.update(T, P);
-    moon.position.set(P.x - 30, 35, P.z - 40); sky.userData.update(T, camera.position); strip.update(T); moon.target.position.set(P.x, 0, P.z);
+    lightPool.update(dt, camera); moon.position.set(P.x - 30, 35, P.z - 40); sky.userData.update(T, camera.position); strip.update(T); moon.target.position.set(P.x, 0, P.z);
     D.premiere.visible = (act && act.m.id === 'finale') || save.story >= 7;
     const z = D.zones.find(z => P.x > z.minX && P.x < z.maxX && P.z > z.minZ && P.z < z.maxZ); setZone(z ? z.name : 'The Strip');
   } else { if (where === 'club') CLUB.update(T); setZone(SC[where].zone); }
@@ -890,8 +894,19 @@ canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); contextLo
 function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); composer.setSize(w, h); bloom.resolution.set(w / 2, h / 2); edgePass.uniforms.resolution.value.set(1 / (w * renderer.getPixelRatio()), 1 / (h * renderer.getPixelRatio())); camera.aspect = w / h; gradePass.uniforms.aspect.value = w / h; camera.updateProjectionMatrix(); const ms = Math.round(Math.min(170, w * 0.28) * Math.min(devicePixelRatio, 2)); map.width = map.height = ms; }
 addEventListener('resize', resize); resize();
 const clock = new THREE.Clock();
-function frame() { requestAnimationFrame(frame); const dt = Math.min(clock.getDelta(), 0.05); if (document.hidden || contextLost) return; update(dt); pressed.clear(); if (where === 'world') wet.render(renderer, world, camera); composer.render(); }
-let preferredQuality = 'balanced';
+// Game time stays real-time on slow machines: a long frame is run as several updates of at most 0.05 s each
+// (car collisions, chase ramming and traffic stay stable), up to 0.2 s per frame (below 5 fps the game slows down).
+function frame() {
+  requestAnimationFrame(frame); const dt = Math.min(clock.getDelta(), 0.2); if (document.hidden || contextLost) return;
+  const n = Math.ceil(dt / 0.05 - 1e-6) || 1; for (let i = 0; i < n; i++) { update(dt / n); pressed.clear(); }
+  if (where === 'world') wet.render(renderer, world, camera); composer.render();
+}
+// First launch: integrated Intel graphics (UHD / Iris) can't hold Balanced outdoors, so they start on Performance.
+function integratedIntel() {
+  try { const gl = renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info');
+    return /intel|uhd|iris/i.test(String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER))); } catch (_) { return false; }
+}
+let preferredQuality = integratedIntel() ? 'performance' : 'balanced';
 try { const stored = localStorage.getItem('mvp_graphics_quality'); if (['performance', 'balanced', 'cinematic'].includes(stored)) preferredQuality = stored; } catch (_) {}
 applyQuality(preferredQuality);
 refreshHud(); if (charsReady) $('#loading').hidden = true; if (DEMO) { demoStarted = true; update(0); demoTitle(); } frame();

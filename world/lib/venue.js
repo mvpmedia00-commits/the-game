@@ -32,7 +32,7 @@ export function buildVelvetExterior(parent) {
   // Doors animate visually as the player approaches; there are no new blockers.
   const doors=[];
   for(const side of [-1,1]){
-    const door=new THREE.Group();door.position.set(2+side*.805,0,-.03);root.add(door);
+    const door=new THREE.Group();door.userData.dynamic=true;door.position.set(2+side*.805,0,-.03);root.add(door); // slides open: keep out of the static batches
     box(door,glass,0,1.75,0,1.57,3.5,.09);
     for(const x of [-.76,.76])box(door,gold,x,1.75,.08,.045,3.5,.055);
     box(door,gold,0,.08,.08,1.57,.09,.055);box(door,gold,0,3.46,.08,1.57,.09,.055);

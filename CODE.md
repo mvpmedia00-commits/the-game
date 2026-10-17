@@ -37,6 +37,8 @@ the-game/
 │       ├── sky.js          Night sky shader (city glow, clouds, moon) + streetlight haze cones
 │       ├── reflect.js      Wet-street planar reflections
 │       ├── strip.js        LED video boards, bulb marquees, Crown pylon, skybridge, street clutter
+│       ├── batch.js        Merges unmoving street meshes per material (fewer draw calls)
+│       ├── lightpool.js    Drives a few real lights from the street's many fixed lights
 │       ├── visuals.js      Puddles, drains, steam, character fill light, color grade
 │       ├── materials.js    Loads the CC0 asphalt/concrete photo textures
 │       └── story.js        All story data: missions, dialogue, rungs, gear, sets, talent attitudes (85 lines)
@@ -64,7 +66,8 @@ The game is one loop that runs about 60 times a second:
 
 ```
 frame()
- └─ update(dt)            dt = seconds since last frame (capped at 0.05)
+ └─ update(dt)            dt = seconds since last frame. A long frame runs as several updates of at most
+                          0.05 s each (up to 0.2 s per frame), so game speed stays real-time on slow machines
      1. Clock: 2 game-minutes per real second. Midnight → new day → royalties paid.
      2. First launch: Tony's phone call (mission 1) plays automatically.
      3. Input: keyboard + touch joystick → forward/right amounts.
@@ -344,7 +347,16 @@ The world game still uses the code-built characters; swapping the real models in
 - **Balanced** adds them back, with reflections at 1/3 resolution on desktop. On phones, Balanced skips reflections.
 - **Cinematic** draws reflections at 1/2 resolution, at a higher pixel ratio.
 
-**Cost** (desktop, Cinematic, at the studio): about 1,130 draw calls for the main view plus about 540 for the reflection pass.
+On first launch (no saved choice in `mvp_graphics_quality`), integrated Intel graphics (Intel / UHD / Iris, read from `WEBGL_debug_renderer_info`) start on **Performance**; everything else starts on Balanced.
+
+**Keeping the street cheap:**
+- `world/lib/batch.js` → `mergeStatic()` merges the unmoving meshes of the district, the strip dressing and the parked cars that share a material into one mesh per 64 m map cell. Building blocks (facade, facade, roof materials) are split per material first. Anything under an object with `userData.dynamic` (the spinning crown, the Velvet Room's sliding doors), hidden groups (the premiere set) and transparent materials are left alone. **If you add something that moves, rotates or is shown/hidden later, give it (or its group) `userData.dynamic = true`.**
+- Small, non-glowing props go to layer 1, which the reflection pass skips.
+- Traffic cars use pre-merged wheels and lamps (6 draws instead of 14). Your own car keeps separate wheels so the front ones steer.
+- `world/lib/lightpool.js` → `LightPool`: the 14 fixed street point lights (shop doors, canopy, fountain, pool, LED spill) drive 5 real lights near the camera, fading in and out. Every point light costs every lit pixel, so this is the biggest GPU saving on integrated graphics. The light count never changes, so shaders never recompile.
+- LED boards redraw at most two per frame (the stalest first), and the Crown pylon's two jackpot screens share one canvas.
+
+**Cost** (desktop, Balanced, on the boulevard at the spawn point): about 500 draw calls for the main view (including the shadow pass) plus about 230 for the reflection pass, down from about 890 + 530. See `reports/2026-10-17-street-performance-fixes.md` for measurements.
 
 ---
 
