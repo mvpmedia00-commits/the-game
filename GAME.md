@@ -115,9 +115,9 @@ The playable area is the crossing of **Las Vegas Blvd** (north–south, about 60
   - A B average pays $80.
 
 ### The phone (Tab, M, or the PHONE button)
-- **Story:** all 8 missions, which are done, and who to see next.
+- **Story:** all 10 missions, which are done, and who to see next. The header shows your cash, Respect and Street.
 - **Photo gigs:** three freelance jobs a day at the pool, the casino forecourt, under the billboard or the chapel. Some are timed rush jobs.
-- **Talent roster:** everyone you've signed and who is still available.
+- **Talent roster:** everyone you've signed and who is still available. Tap a signed performer to see her loyalty or take her to dinner ($250, +8 loyalty, once a day).
 - **Catalog:** every film you've released and what it earns per day.
 - **Music / Voices:** switch the soundtrack and spoken dialogue on or off.
 - **Step outside:** appears whenever you're indoors and takes you straight back to Las Vegas Blvd. Interiors also have a lit EXIT door: in the Velvet Room it's on the back wall behind where you come in, with red floor lights leading to it.
@@ -130,18 +130,30 @@ The playable area is the crossing of **Las Vegas Blvd** (north–south, about 60
 
 ---
 
-## 5. The story: 8 missions
+## 5. The story: 10 missions
 
 | # | Mission | Starts with | What you do | Reward |
 |---|---|---|---|---|
 | 1 | **Velvet Hours** | Phone call from Tony Velvet | Walk to The Velvet Room, go inside, shoot Ruby's headliner set (4 photos) | $900, +8 rep, **Ruby signs** |
 | 2 | **Proof Run** | Tony at the club door | Get the proofs to the editor at Crown Casino within **75 s** (drive) | $600, +6 rep |
-| 3 | **Snatch & Grab** | Editor at Crown Casino | A Neon Kings coupe stole your memory cards. **Chase and ram it** until its health bar empties | $1,000, +10 rep |
+| 3 | **Snatch & Grab** | Editor at Crown Casino | A Neon Kings coupe stole your memory cards. **Chase and ram it** until its health bar empties | $1,000, +10 rep, +6 Street |
 | 4 | **Pool Party Cover** | Dee at Lens & Light | Reach the Desert Rose pool within **120 s**, shoot Nova (5 photos) | $1,500, +10 rep, **Nova signs** |
 | 5 | **Keys to the Kingdom** | Landlord at Room 12 | Buy the soundstage at MVP Studios for **$3,500** | +10 rep, **you own the studio** |
 | 6 | **First Feature** | Jade outside the studio | Go inside and produce your first film with Jade | +12 rep, **Jade signs** |
-| 7 | **Bootleg Boulevard** | Coco at Scarlet Lounge | Your film is being bootlegged. **Ram the bootleg van** on Fremont | $2,500, +12 rep, **Coco signs** |
-| 8 | **Beyond the Frame** | Ruby outside the studio | Reach the premiere at Crown Casino within **90 s**, shoot the red carpet with Ruby, Nova and Jade (6 photos), then **stop Silas Crane's car** | $5,000, +20 rep, ending |
+| 7 | **Bootleg Boulevard** | Coco at Scarlet Lounge | Your film is being bootlegged. **Ram the bootleg van** on Fremont | $2,500, +12 rep, +6 Street, **Coco signs** |
+| 8 | **Lex's Terms** | Lex Vaughn outside the chapel | Shoot Lex live on her stream (4 photos), then negotiate her contract in front of her chat | $1,200, +8 rep, **Lex signs** |
+| 9 | **Street Tax** | Phone call from Dutch (Neon Kings) | Pay $1,500 in protection money (mission ends, no reward), or refuse and **run his truck off the boulevard** | $1,200, +8 rep, +12 Street |
+| 10 | **Beyond the Frame** | Ruby outside the studio | Reach the premiere at Crown Casino within **90 s**, shoot the red carpet with Ruby, Nova and Jade (6 photos), then **stop Silas Crane's car** | $5,000, +20 rep, +8 Street, ending |
+
+**Your call:**
+- Most missions end with a choice, such as who owns the photos, whether to protect your talent, or whether to take a bootlegger's money.
+- There's no right answer on screen. Each choice moves your Respect, Street and the loyalty of the people involved, and a toast shows what changed.
+
+**Endings** (decided at the credits):
+- **Empire of One:** your talent's average loyalty is under 40.
+- **King of Fremont:** Street 50 or more.
+- **The Legit Mogul:** Respect 70+ and average loyalty 60+.
+- **Own the Frame:** everything else.
 
 **Chases:**
 - The getaway driver follows the real roads. At the main intersection it turns whichever way takes it farthest from you.
@@ -157,12 +169,18 @@ The playable area is the crossing of **Las Vegas Blvd** (north–south, about 60
 ## 6. The business
 
 ### Money and reputation
-- You start with **$250** and **0 rep**. Missions, gigs and quality bonuses pay cash.
-- Rep (0–100) raises gig pay, film sales and photo bonuses, and unlocks talent.
+- You start with **$250**, **0 Respect** and **0 Street**. Missions, gigs and quality bonuses pay cash.
+- **Respect** (0–100, called rep in the code) raises gig pay, film sales and photo bonuses, and unlocks talent.
+- **Street** (0–100) comes from chases and standing up to the Neon Kings. It shortens chases (Neon Kings cars give up sooner) and adds $5 per point to gig pay.
+- **Loyalty** (0–100 per performer, starts at 50):
+  - 80+ gives a 15% discount on her day rate; under 35 she charges 25% more; under 15 she won't work with you.
+  - In productions, loyal talent adds quality.
+  - Matching her light and mood on set raises loyalty, and missing it lowers it.
+- **Bootlegs:** if you take the van driver's cut in Bootleg Boulevard, bootleggers keep 20% of your royalties for good.
 
 ### Photo gigs
 - Three a day from the phone.
-- Pay = $250 + 12 × rep + a random tip.
+- Pay = $250 + 12 × Respect + 5 × Street + a random tip.
 - Rush gigs give you 90 seconds to arrive.
 - A freelance model (all adults) waits at the location and poses for 4 photos.
 
@@ -254,7 +272,7 @@ Productions are about the business: casting, sets, lighting, mood, camera and th
 
 | Folder | Contents |
 |---|---|
-| `world/` | **This game**: the district, driving, interiors, 8 missions, business systems. See [CODE.md](CODE.md) for how the code works |
+| `world/` | **This game**: the district, driving, interiors, 10 missions, choices and three endings, business systems. See [CODE.md](CODE.md) for how the code works |
 | `hd-demo/` | Character showroom: studio and pool sets, physics slider, drag-and-drop `.glb` loading |
 | `beyond-the-frame/` | The earlier prototype (the same story in a 2D/3D city) |
 | `assets/characters/` | Drop-in spot for real character models (`mvp.glb`, `ruby.glb`) |

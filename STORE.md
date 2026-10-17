@@ -10,7 +10,7 @@ The paperwork is **invisible**. Nobody stops the action to check an ID or wave a
 
 ## The climb
 
-You start as a **hired lens** and end as a **producer who owns his masters**. Seven rungs, no filler:
+You start as a **hired lens** and end as a **producer who owns his masters**. Nine rungs, no filler:
 
 1. **Vendor.** Tony Velvet calls, you shoot Ruby's headliner set, you get paid. You're someone else's camera.
 2. **Runner.** You race proofs to an editor and chase a paparazzo who stole your cards.
@@ -18,7 +18,9 @@ You start as a **hired lens** and end as a **producer who owns his masters**. Se
 4. **Landlord.** You buy a dead soundstage. A room is where films get made.
 5. **Producer.** Jade Rivers — veteran performer *and* director, your mentor — walks you through your first feature. You cast, you set the stage, you call the shots, you wrap.
 6. **Distributor.** Your film gets bootlegged. You hunt the van. Now you defend your own IP.
-7. **Mogul.** You shoot the premiere of your own movie while your rival makes a last grab for the master drive. You end the night owning the frame, the film, and the future.
+7. **Talent Magnet.** Lex Vaughn reads your contract to two million people on a live stream. Make it fair or make it famous.
+8. **Untouchable.** The Neon Kings want protection money for your studio. Pay the street tax, or run their truck off the boulevard.
+9. **Mogul.** You shoot the premiere of your own movie while your rival makes a last grab for the master drive. You end the night owning the frame, the film, and the future.
 
 ---
 
@@ -28,8 +30,11 @@ No red tape on screen. Just the levers that make a studio run:
 
 - **Talent roster.** Ruby, Nova, Jade, Coco, Lex — each with a star rating, a day rate, and a taste (neon, warm, dramatic, playful). You *sign* them. They become your stable, your brand, your recurring cast.
 - **Productions.** One film a day. Cast up to two signed performers, pick a set, pick a crew tier, make director's calls on lighting and mood. Match a performer's taste for bonus quality.
-- **Royalties.** Quality drives opening sales. Opening sales pay **8% every day after**. You're not making one film — you're building a catalog that pays while you sleep.
-- **Rep (0–100).** The currency of access. Raises pay, unlocks talent, gates the good jobs.
+- **Royalties.** Quality drives opening sales. Opening sales pay **5% every day after**. You're not making one film — you're building a catalog that pays while you sleep.
+- **Respect (0–100).** The currency of access. Raises pay, unlocks talent, gates the good jobs.
+- **Street (0–100).** Earned on the boulevard. The Neon Kings fold faster and street jobs pay more.
+- **Loyalty.** Every performer remembers how you treated her: paid on time, protected in the edit, lit the way she likes. Loyal talent works cheaper and better. Burn them and they walk.
+- **Your call.** Every mission ends on a choice that has consequences, and the game has three endings: The Legit Mogul, King of Fremont, or Empire of One.
 
 Every performer is a named adult professional with a paid day rate. That's the only rule that matters, and it's automatic. Scenes end at **"Cut! That's a wrap."** and nobody broke stride to file a form.
 
