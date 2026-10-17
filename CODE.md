@@ -431,6 +431,23 @@ The world game still uses the code-built characters; swapping the real models in
   - **When you replace a model, texture or voice file in place, bump `VERSION` in `sw.js`**; otherwise installed players keep the old copy.
 - Needs HTTPS (GitHub Pages is fine). The Claude artifact copy can't be installed.
 
+## 12i. MVP Media Studios and Ruby at work
+
+- **The building** (`world/lib/studiohq.js`, around Stage A from `hd-demo/lib/studio.js`):
+  - **Lobby:** reception, red sofa, film wall. Eight frames show your latest releases; `HQ.setPosters` runs on entering.
+  - **Hair & Makeup / Wardrobe** wing, **Edit Bay** with an awards shelf, and **craft service**.
+  - Brick walls and the door with the exit at the front.
+  - It also returns the colliders, bounds, exit, entry spot and Ruby's job list.
+- **Ruby** (`world/lib/helper.js`), once you own the studio (`save.studio`):
+  - She lives there, except on the premiere's red carpet.
+  - She cycles through jobs: sweeping, wiping mirrors, sorting wardrobe, carrying gear to the stage, setting lights, logging footage, dusting the film wall and coffee breaks.
+  - She walks between jobs along the aisle in front of the stage (z ≈ 7.9), with mocap walking and a hand-made pose plus a prop for each job.
+- **Talking to Ruby** (`openRuby`):
+  - Chat (lines in `RUBY_STUDIO`, story.js).
+  - **Prep the set:** +6 quality on your next film, once a day.
+  - **Take a break together:** loyalty +3, once a day.
+- She gives the finale from inside the studio. The beacon points at the studio door.
+
 ## 13. Testing and debugging
 
 - `window.__world` in the browser console exposes the game state: `__world.save` (edit cash, story, etc.), `__world.startMission(__world.STORY[3], 'story')`, `__world.enter('club')`, `__world.update(0.033)` to step one frame (`__world.tick(dt)` also clears key presses, for scripted tests).

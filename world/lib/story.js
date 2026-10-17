@@ -126,3 +126,18 @@ export const ATTITUDE = {
   coco: 'Coco brings the burlesque tease to everything.',
   lex: 'Lex runs her own company and has no patience for amateurs.',
 };
+// Ruby at MVP Studios (once you own it): what she says while she keeps the place running
+export const RUBY_STUDIO = {
+  chat: [
+    'Floors are swept, lenses are wiped, coffee is hot. Your studio does not run itself, boss.',
+    'Somebody left gaffer tape on the cyc again. I am not naming names. It was you.',
+    'I reorganized the wardrobe by color. Do not touch it.',
+    'Jade says the key light was two stops hot yesterday. I fixed it.',
+    'The edit bay smells like energy drinks. That is how I know you were working late.',
+    'Every film that goes up on that wall, I want my name somewhere in the credits.',
+    'You bought a room. I am making it a studio.',
+  ],
+  prep: 'Give me twenty minutes. Lights set, wardrobe pressed. The set will be ready to shoot.',
+  prepped: 'The set is already prepped for your next shoot. Go make something.',
+  brk: 'Five minutes. Then back to work. This place does not clean itself.',
+};

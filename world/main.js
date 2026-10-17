@@ -22,7 +22,9 @@ import { buildDistrict } from './lib/district.js?v=block-3';
 import { Traffic, Pedestrians, carModel } from './lib/npcs.js';
 import { buildClub } from './lib/club.js?v=block-3';
 import { PlayerCar, Chaser } from './lib/car.js';
-import { STORY, NPC_LOOKS, FREELANCE, FREE_LOOKS, GIG_SPOTS, GEAR, SETS, BUDGET, CALLS, FILM_TITLES, RUNGS, ATTITUDE } from './lib/story.js';
+import { buildStudioHQ } from './lib/studiohq.js';
+import { StudioHelper } from './lib/helper.js';
+import { RUBY_STUDIO, STORY, NPC_LOOKS, FREELANCE, FREE_LOOKS, GIG_SPOTS, GEAR, SETS, BUDGET, CALLS, FILM_TITLES, RUNGS, ATTITUDE } from './lib/story.js';
 
 const $ = s => document.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -99,9 +101,8 @@ wet.apply(D.groundMats.asphalt, 0.32, 0.68); wet.apply(D.groundMats.walk, 0.12, 
 wet.collectGround(world);
 
 // ---------- interiors
-const studio = new THREE.Scene(); buildStudio(studio, true);
-{ const exitSign = C.signMesh('EXIT', '#ff2a3a', 1.4, 0.55); exitSign.position.set(0, 3.2, 8.75); exitSign.rotation.y = Math.PI; studio.add(exitSign);
-  const door = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.8, 0.1), new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.5, metalness: 0.6 })); door.position.set(0, 1.4, 8.85); studio.add(door); }
+const studio = new THREE.Scene(); buildStudio(studio, true); const HQ = buildStudioHQ(studio); // Stage A + the rest of the building
+const rubyHelp = new StudioHelper(HQ.jobs, HQ.aisleZ, studio); // Ruby's routine at the studio
 { const pm = new THREE.PMREMGenerator(renderer); studio.environment = pm.fromScene(new RoomEnvironment(renderer), 0.04).texture; pm.dispose(); }
 studio.traverse(o => { if (o.isLight) o.intensity *= o.isSpotLight || o.isPointLight ? Math.PI * 4 : Math.PI; });
 const club = new THREE.Scene(); const CLUB = buildClub(club);
@@ -113,7 +114,7 @@ const club = new THREE.Scene(); const CLUB = buildClub(club);
   club.environment = pm.fromScene(env, 0.04).texture; pm.dispose(); }
 const SC = {
   world: { scene: world, exposure: 0.85, colliders: D.colliders, circles: D.circles },
-  studio: { scene: studio, exposure: 0.9, colliders: [], circles: [], bounds: { minX: -6.5, maxX: 6.5, minZ: -2.2, maxZ: 7.5 }, exit: { x: 0, z: 7.2, r: 3 }, zone: 'MVP Studios · Stage A' },
+  studio: { scene: studio, exposure: 0.9, colliders: HQ.colliders, circles: HQ.circles, bounds: HQ.bounds, exit: HQ.exit, zone: 'MVP Media Studios' },
   club: { scene: club, exposure: 0.95, colliders: CLUB.colliders, circles: CLUB.circles, bounds: CLUB.bounds, exit: CLUB.exit, zone: 'The Velvet Room' },
 };
 // Preserve detail on oblique roads, shop signs and costume textures.
@@ -218,7 +219,7 @@ function placement(id) {
   switch (id) {
     case 'ruby':
       if (carpetStep) return { scene: 'world', x: N.carpet.x - 3, z: N.carpet.z - 0.6, ry: Math.PI / 2, pose: 'pose' };
-      if (s === 9 && !act) return { scene: 'world', x: 12.6, z: 40, ry: -Math.PI / 2, pose: 'idle' }; // waiting to start the finale
+      if (save.studio) return rubyHelp.pl; // lives at MVP Studios once it's yours: cleaning, setting up, helping (world/lib/helper.js)
       if (s >= 1 || (inStory === 'velvet' && act.i >= 1)) return { scene: 'club', x: CLUB.stageSpot.x, z: CLUB.stageSpot.z, y: CLUB.stageSpot.y, ry: 0, pose: 'dance' };
       return { scene: 'world', x: N.ruby.x, z: N.ruby.z, ry: N.ruby.ry, pose: 'idle' };
     case 'nova':
@@ -249,6 +250,7 @@ function updateNPCs(dt, t) {
   const list = Object.values(NPCS); if (freeModel) list.push(freeModel);
   for (const n of list) {
     const pl = n === freeModel ? n.fixed : placement(n.id);
+    if (n.id === 'ruby') { if (pl && pl.pose === 'helper') rubyHelp.tick(dt); else rubyHelp.hideProps(); }
     const sceneObj = pl ? SC[pl.scene].scene : null;
     if (n.rig.root.parent !== sceneObj) { if (n.rig.root.parent) n.rig.root.parent.remove(n.rig.root); if (sceneObj) sceneObj.add(n.rig.root); }
     n.place = pl; if (!pl) continue;
@@ -256,6 +258,7 @@ function updateNPCs(dt, t) {
     n.rig.root.position.set(pl.x, (pl.y || 0) + (pl.scene === 'world' && onSidewalk(pl.x, pl.z) ? 0.16 : 0), pl.z); n.rig.root.rotation.y = pl.ry;
     if (pl.scene !== where) continue;
     n.poseT += dt;
+    if (pl.pose === 'helper') { rubyHelp.pose(C, n.rig, dt, t); continue; }
     if (pl.pose === 'dance') { C.setPose(n.rig, DANCE(t), Math.min(1, dt * 12)); n.peak = Math.abs(Math.sin(t * 4)) > 0.85 ? 1 : 0.4; }
     else if (pl.pose === 'pose') { if (n.poseT > 3) { n.poseT = 0; n.pose = (n.pose + 1) % POSE_LIST.length; } C.setPose(n.rig, POSE_LIST[n.pose], Math.min(1, dt * 4)); n.peak = n.poseT > 0.9 && n.poseT < 2.6 ? 1 : 0.35; }
     else if (pl.pose === 'guard') C.setPose(n.rig, { shL: [-0.3, 0, -0.35], elL: [-1.3, 0, 0], shR: [-0.3, 0, 0.35], elR: [-1.3, 0, 0], hpL: [0, 0, 0.1], hpR: [0, 0, -0.1] }, Math.min(1, dt * 4));
@@ -391,7 +394,7 @@ function enter(name, from) {
   const f = $('#fade'); f.classList.add('on'); sfx('door');
   setTimeout(() => {
     where = name; renderPass.scene = SC[name].scene; SC[name].scene.add(mvp.root);
-    if (name === 'studio') { P.x = 0; P.z = 5.6; P.a = P.ry = Math.PI; cam.yaw = 0; }
+    if (name === 'studio') { P.x = HQ.entry.x; P.z = HQ.entry.z; P.a = P.ry = Math.PI; cam.yaw = 0; cam.pitch = 0.22; HQ.setPosters(save.releases); }
     else if (name === 'club') { P.x = 0; P.z = 11.5; P.a = P.ry = Math.PI; cam.yaw = 0; cam.pitch = 0.18; }
     else { const o = outsideDoor(from); P.x = o.x; P.z = o.z; P.a = P.ry = -Math.PI / 2; cam.yaw = Math.PI / 2; }
     doorLock = performance.now() + 1000;
@@ -495,6 +498,16 @@ function incomingCall(n) {
     ['Decline', () => { stop(); closePanel(); toast('Call back any time from your PHONE.'); }, { plain: true }]]);
   panel.dataset.locked = 'true';
 }
+// Ruby at the studio: chat, have her prep the set (+6 quality on your next film), or take a break together
+function openRuby() {
+  const r = NPCS.ruby; rubyHelp.attend(P.x, P.z, 30);
+  const prepped = !!save.rubyPrep, prepToday = save.rubyPrepDay === save.day, broke = save.rubyBreak === save.day, done = () => { rubyHelp.attend(P.x, P.z, 3); };
+  panelCard('MVP Media Studios', 'Ruby Monroe', `<p class="muted">${esc(rubyHelp.before === 'walk' ? 'On her way to the next job' : rubyHelp.job.say)}. Loyalty ${loyal('ruby')} · ${loyalWord(loyal('ruby'))}</p>`, [
+    ['Chat', () => { closePanel(); talk([['Ruby Monroe', pick(RUBY_STUDIO.chat)]], done); }],
+    ['Prep the set for the next shoot', () => { if (prepped || prepToday) return; closePanel(); save.rubyPrep = true; save.rubyPrepDay = save.day; persist(); talk([['Ruby Monroe', RUBY_STUDIO.prep]], done); }, { plain: true, disabled: prepped || prepToday, small: prepped ? 'Done: +6 quality on your next film' : prepToday ? 'Once a day' : '+6 quality on your next film · once a day' }],
+    ['Take a break together', () => { if (broke) return; closePanel(); save.rubyBreak = save.day; addLoyal('ruby', 3); persist(); toast('Ruby trusts you more'); talk([['Ruby Monroe', RUBY_STUDIO.brk]], done); }, { plain: true, disabled: broke, small: broke ? 'Already today' : 'Loyalty +3 · once a day' }],
+    ['Let her work', () => { closePanel(); done(); }, { plain: true }]]);
+}
 function confirmNewGame() {
   panelCard('New game', 'Start over?', '<p>This erases your money, story progress, studio, talent and films. It can\'t be undone.</p>',
     [['Yes, start over', () => { removeEventListener('beforeunload', persist); try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); }], ['Cancel', () => { closePanel(); openPhone(); }, { plain: true }]]);
@@ -582,11 +595,12 @@ function wrapProd() {
   let q = cast.reduce((s, t) => s + t.star * 12, 0) / cast.length + (cast.length === 2 ? 8 : 0) + SETS[prod.set].q + save.gear.light * 5;
   for (const t of cast) { if (t.light === prod.calls.light) q += 7; if (t.mood === prod.calls.mood) q += 7; }
   q += prod.cast.reduce((s, id) => s + (loyal(id) - 50) / 8, 0) / prod.cast.length; // loyal talent gives you more on set
+  const rubyPrep = !!save.rubyPrep; if (rubyPrep) { q += 6; save.rubyPrep = false; } // Ruby prepped the set
   const loyNotes = prod.cast.map(id => { const t = C.TALENT[id], n = (t.light === prod.calls.light ? 3 : -2) + (t.mood === prod.calls.mood ? 3 : -2) + (prod.budget === 2 ? 2 : 0); addLoyal(id, n); return `${t.name.split(' ')[0].replace(/"/g, '')} ${n > 0 ? 'loved' : 'didn\'t love'} it (loyalty ${n > 0 ? '+' : ''}${n})`; });
   q += prod.calls.cam === 'dolly' ? 5 : prod.calls.cam === 'handheld' ? 3 : 1; q = Math.round(clamp(q * BUDGET[prod.budget].m, 10, 100));
   // film income: about a third of the original payout, so gigs, gear and missions still matter
   const gross = Math.round(q * (25 + save.rep) * 0.72), royalty = Math.round(gross * 0.05), title = FILM_TITLES[save.releases.length % FILM_TITLES.length] + (save.releases.length >= FILM_TITLES.length ? ' ' + (save.releases.length + 1) : '');
-  panelCard('Wrap', "Cut! That's a wrap.", `<p>${q >= 75 ? 'The scene works. Everybody hit their marks and you can feel it in the dailies.' : q >= 50 ? 'Solid, sellable, nobody will remember it next year.' : 'It opens soft and dies at the box office. Listen to your talent next time.'}</p><h2>${esc(title)}</h2><p>Quality <b>${q}</b> / 100 · Opening sales <span class="money">${fmt(gross)}</span> · Royalties <span class="money">${fmt(royalty)}</span> per day</p><p class="muted">${esc(loyNotes.join(' · '))}</p>`,
+  panelCard('Wrap', "Cut! That's a wrap.", `<p>${q >= 75 ? 'The scene works. Everybody hit their marks and you can feel it in the dailies.' : q >= 50 ? 'Solid, sellable, nobody will remember it next year.' : 'It opens soft and dies at the box office. Listen to your talent next time.'}</p><h2>${esc(title)}</h2><p>Quality <b>${q}</b> / 100 · Opening sales <span class="money">${fmt(gross)}</span> · Royalties <span class="money">${fmt(royalty)}</span> per day</p><p class="muted">${esc([...(rubyPrep ? ['Ruby prepped the set (+6)'] : []), ...loyNotes].join(' · '))}</p>`,
     [['Release it', () => { save.cash += gross; save.releases.push({ title, royalty, q }); save.lastProduce = save.day; addRep(q >= 70 ? 5 : 2); sfx('win'); persist(); closePanel(); refreshHud(); toast(`${title} is out. ${fmt(gross)} in opening sales.`); const st = step(); const wasStory = prod.story; prod = null; if (wasStory && st && st.t === 'produce') nextStep(); }]]);
 }
 // three endings (plus the default), decided by how you played: Respect, Street and your talent's loyalty
@@ -638,6 +652,8 @@ function interaction() {
   if (driving) return { prompt: 'Get out of the car', fn: exitCar, key: 'F' };
   if (where !== 'world') {
     const ex = SC[where].exit; if (performance.now() > doorLock && near(ex.x, ex.z, ex.r || 2.2)) add(0, 'Exit to Las Vegas Blvd', () => enter('world', where));
+    if (n && !act && n.giver !== 'phone') { const g = NPCS[n.giver === 'ruby2' ? 'ruby' : n.giver]; if (g && g.place && g.place.scene === where) { const d = Math.hypot(P.x - g.x, P.z - g.z); if (d < 3) add(d - 1, `${n.who}: ${n.title}`, () => talk(n.intro, () => startMission(n, 'story'))); } }
+    if (where === 'studio') { const r = NPCS.ruby; if (r.place && r.place.pose === 'helper') { const d = Math.hypot(P.x - r.x, P.z - r.z); if (d < 2.6) add(d + 0.3, 'Talk to Ruby', openRuby); } }
     if (where === 'studio' && st && st.t === 'produce') { const j = NPCS.jade; if (j.place && j.place.scene === 'studio' && near(j.x, j.z, 3)) add(0.5, 'Talk to Jade: start the production', () => startProduction(true)); }
     return opts.sort((a, b) => a.d - b.d)[0] || null;
   }
@@ -667,7 +683,7 @@ function objectiveTarget() {
   if (where !== 'world') return null;
   const st = step(), n = nextStory();
   if (st) { if (st.t === 'goto') return SPOTS()[st.to]; if (st.t === 'chase') return chaser; if (st.t === 'enter') return st.scene === 'club' ? SPOTS().velvet : D.pois.find(p => p.id === 'studio'); if (st.t === 'buy' || st.t === 'produce') return D.pois.find(p => p.id === 'studio'); if (st.t === 'shoot') { const t = shootTargets(); return t && t[0]; } }
-  if (n && !act && n.giver !== 'phone') { const g = NPCS[n.giver === 'ruby2' ? 'ruby' : n.giver]; return g && g.place && g.place.scene === 'world' ? g : null; }
+  if (n && !act && n.giver !== 'phone') { const g = NPCS[n.giver === 'ruby2' ? 'ruby' : n.giver]; return g && g.place ? (g.place.scene === 'world' ? g : g.place.scene === 'studio' ? D.pois.find(p => p.id === 'studio') : null) : null; }
   return null;
 }
 
@@ -897,4 +913,4 @@ try { const stored = localStorage.getItem('mvp_graphics_quality'); if (['perform
 applyQuality(preferredQuality);
 refreshHud(); if (charsReady) $('#loading').hidden = true; if (DEMO) { demoStarted = true; update(0); demoTitle(); } frame();
 addEventListener('beforeunload', persist);
-window.__world = { SC, traffic, set debugCam(v) { debugCam = v; }, probe() { const r = renderer, out = {}; r.info.autoReset = false; const count = (k, f) => { r.info.reset(); f(); out[k] = r.info.render.calls; }; count('main', () => r.render(world, camera)); count('reflect', () => wet.render(renderer, world, camera)); const by = {}; world.traverse(o => { if (o.isMesh || o.isSprite || o.isPoints) { let p = o; while (p.parent && p.parent !== world) p = p.parent; const k = (p.name || p.type) + ':' + (o.isSprite ? 'sprite' : o.isInstancedMesh ? 'inst' : 'mesh'); by[k] = (by[k] || 0) + (Array.isArray(o.material) ? o.material.length : 1); } }); out.by = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 14); r.info.autoReset = true; return out; }, renderFrame() { if (where === 'world') wet.render(renderer, world, camera); composer.render(); }, P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update, voices, tick(dt) { update(dt); pressed.clear(); }, persist, get mvp() { return mvp; }, get paused() { return paused; }, get driving() { return driving; } };
+window.__world = { SC, traffic, set debugCam(v) { debugCam = v; }, probe() { const r = renderer, out = {}; r.info.autoReset = false; const count = (k, f) => { r.info.reset(); f(); out[k] = r.info.render.calls; }; count('main', () => r.render(world, camera)); count('reflect', () => wet.render(renderer, world, camera)); const by = {}; world.traverse(o => { if (o.isMesh || o.isSprite || o.isPoints) { let p = o; while (p.parent && p.parent !== world) p = p.parent; const k = (p.name || p.type) + ':' + (o.isSprite ? 'sprite' : o.isInstancedMesh ? 'inst' : 'mesh'); by[k] = (by[k] || 0) + (Array.isArray(o.material) ? o.material.length : 1); } }); out.by = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 14); r.info.autoReset = true; return out; }, renderFrame() { if (where === 'world') wet.render(renderer, world, camera); composer.render(); }, P, car, cam, get save() { return save; }, enter, D, NPCS, startMission, STORY, get act() { return act; }, nextStep, camera, composer, enterCar, exitCar, photo, get where() { return where; }, get chaser() { return chaser; }, refreshHud, update, voices, rubyHelp, tick(dt) { update(dt); pressed.clear(); }, persist, get mvp() { return mvp; }, get paused() { return paused; }, get driving() { return driving; } };

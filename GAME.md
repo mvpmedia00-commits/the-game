@@ -166,6 +166,19 @@ The playable area is the crossing of **Las Vegas Blvd** (north–south, about 60
 
 ---
 
+## 5b. MVP Media Studios
+
+Once you buy the studio it's a full building:
+- **Lobby:** reception, lounge and a film wall showing your latest releases.
+- **Stage A:** the cyclorama set.
+- **Hair & Makeup / Wardrobe** wing and **Edit Bay** with an awards shelf.
+- **Craft service** table.
+
+**Ruby** works there from then on: sweeping, cleaning mirrors, sorting wardrobe, hauling gear, setting lights, logging footage and dusting the film wall. Walk up and press **E** to talk:
+- **Prep the set:** +6 quality on your next film, once a day.
+- **Take a break together:** loyalty +3, once a day.
+- **Chat.**
+
 ## 6. The business
 
 ### Money and reputation

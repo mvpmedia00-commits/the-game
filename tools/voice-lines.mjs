@@ -3,7 +3,7 @@
 // Re-run after changing dialogue: a changed line gets a new file name (old recordings keep working for unchanged lines).
 import fs from 'node:fs';
 import { voiceId, SPEAKERS } from '../world/lib/audio.js';
-import { STORY, FREELANCE } from '../world/lib/story.js';
+import { STORY, FREELANCE, RUBY_STUDIO } from '../world/lib/story.js';
 
 const rows = new Map(); // id -> { who, text, where, phone }
 const add = (who, text, where, phone = false) => { if (who === 'Sign' || !text) return; const id = voiceId(who, text); if (!rows.has(id)) rows.set(id, { id, who, text, where, phone: phone && who !== 'MVP' }); };
@@ -13,6 +13,7 @@ for (const m of STORY) {
   for (const st of m.steps) if (st.c) for (const o of st.c.options) for (const [w, t] of o.reply || []) add(w, t, `${m.title} · choice "${o.label}"`);
   if (m.choice) for (const o of m.choice.options) for (const [w, t] of o.reply || []) add(w, t, `${m.title} · choice "${o.label}"`);
 }
+for (const t of [...RUBY_STUDIO.chat, RUBY_STUDIO.prep, RUBY_STUDIO.prepped, RUBY_STUDIO.brk]) add('Ruby Monroe', t, 'MVP Studios · talking to Ruby');
 for (const name of FREELANCE) add(name, 'Love these. I am tagging MVP Media on everything.', 'Photo gig · ending');
 // lines written straight into the game code: ['Speaker', 'line'] (both sides of a ? : are listed)
 const known = new Set([...SPEAKERS, ...FREELANCE]);
